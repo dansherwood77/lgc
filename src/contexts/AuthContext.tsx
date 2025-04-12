@@ -22,6 +22,8 @@ interface AuthContextType {
   }) => Promise<void>;
 }
 
+const API_URL = 'http://localhost:5001/api';
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -41,17 +43,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          // Bypass token validation and set mock user
-          const mockUser = {
-            _id: '1',
-            firstName: 'Test',
-            lastName: 'User',
-            email: 'test@example.com'
-          };
-          setUser(mockUser);
+          const response = await fetch(`${API_URL}/users/profile`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (response.ok) {
+            const userData = await response.json();
+            setUser(userData);
+          } else {
+            localStorage.removeItem('token');
+          }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
+        localStorage.removeItem('token');
       } finally {
         setLoading(false);
       }
@@ -61,21 +67,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Bypass credential checking and automatically log in
-    const mockUser = {
-      _id: '1',
-      firstName: 'Test',
-      lastName: 'User',
-      email: email
-    };
-    
-    localStorage.setItem('token', 'mock-token');
-    setUser(mockUser);
+    const response = await fetch(`${API_URL}/users/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Invalid credentials');
+    }
+
+    const data = await response.json();
+    localStorage.setItem('token', data.token);
+    setUser(data.user);
   };
 
   const register = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
-      const response = await fetch('/api/users/register', {
+      const response = await fetch(`${API_URL}/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,15 +95,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
       }
 
       const data = await response.json();
       localStorage.setItem('token', data.token);
       setUser(data.user);
     } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+      throw new Error('An unexpected error occurred during registration');
     }
   };
 
@@ -103,33 +117,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentPassword?: string;
     newPassword?: string;
   }) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Not authenticated');
 
-      const response = await fetch('/api/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(values),
-      });
+    const response = await fetch(`${API_URL}/users/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(values),
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-
-      const updatedUser = await response.json();
-      setUser(updatedUser);
-    } catch (error) {
-      console.error('Profile update failed:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error('Failed to update profile');
     }
+
+    const updatedUser = await response.json();
+    setUser(updatedUser);
   };
 
   const logout = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await fetch(`${API_URL}/users/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
       localStorage.removeItem('token');
       setUser(null);
     } catch (error) {

@@ -1,0 +1,109 @@
+import express, { Request } from 'express';
+import { Campaign } from '../models/Campaign';
+import { auth } from '../middleware/auth';
+
+interface AuthRequest extends Request {
+  user?: any;
+}
+
+const router = express.Router();
+
+// Create a new campaign
+router.post('/', auth, async (req: AuthRequest, res) => {
+  try {
+    const campaign = new Campaign({
+      ...req.body,
+      createdBy: req.user._id
+    });
+    await campaign.save();
+    res.status(201).json(campaign);
+  } catch (error) {
+    res.status(400).json({ error: 'Failed to create campaign' });
+  }
+});
+
+// Get all campaigns for the authenticated user
+router.get('/', auth, async (req: AuthRequest, res) => {
+  try {
+    const campaigns = await Campaign.find({ createdBy: req.user._id });
+    res.json(campaigns);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch campaigns' });
+  }
+});
+
+// Get a specific campaign
+router.get('/:id', auth, async (req: AuthRequest, res) => {
+  try {
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+    
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    res.json(campaign);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch campaign' });
+  }
+});
+
+// Update a campaign
+router.put('/:id', auth, async (req: AuthRequest, res) => {
+  const updates = Object.keys(req.body);
+  const allowedUpdates = [
+    'name',
+    'description',
+    'startDate',
+    'endDate',
+    'targetRole',
+    'location',
+    'outreachType',
+    'status'
+  ];
+  
+  const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+  
+  if (!isValidOperation) {
+    return res.status(400).json({ error: 'Invalid updates' });
+  }
+
+  try {
+    const campaign = await Campaign.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    updates.forEach(update => (campaign as any)[update] = req.body[update]);
+    await campaign.save();
+    res.json(campaign);
+  } catch (error) {
+    res.status(400).json({ error: 'Failed to update campaign' });
+  }
+});
+
+// Delete a campaign
+router.delete('/:id', auth, async (req: AuthRequest, res) => {
+  try {
+    const campaign = await Campaign.findOneAndDelete({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    res.json(campaign);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete campaign' });
+  }
+});
+
+export default router; 
