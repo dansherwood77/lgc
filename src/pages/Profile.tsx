@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFormik } from 'formik';
+import { useFormik, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import {
   Container,
@@ -11,8 +11,18 @@ import {
   Paper,
   Alert,
   Avatar,
+  Divider,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+
+interface ProfileFormValues {
+  firstName: string;
+  lastName: string;
+  email: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 
 const validationSchema = Yup.object({
   firstName: Yup.string()
@@ -24,24 +34,34 @@ const validationSchema = Yup.object({
     .required('Email is required'),
   currentPassword: Yup.string(),
   newPassword: Yup.string()
-    .min(8, 'Password should be of minimum 8 characters length')
-    .when('currentPassword', (currentPassword, schema) => {
-      return currentPassword && currentPassword.length > 0
-        ? schema.required('New password is required when changing password')
-        : schema;
-    }),
+    .min(8, 'Password should be of minimum 8 characters length'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('newPassword')], 'Passwords must match')
-    .when('newPassword', (newPassword, schema) => {
-      return newPassword && newPassword.length > 0
-        ? schema.required('Please confirm your new password')
-        : schema;
-    }),
+}).test('password-change-validation', 'Password change requires current password', function(value) {
+  const { newPassword, confirmPassword, currentPassword } = value;
+  
+  // If either new password or confirm password is filled, current password is required
+  if ((newPassword || confirmPassword) && !currentPassword) {
+    return this.createError({
+      path: 'currentPassword',
+      message: 'Current password is required to change password'
+    });
+  }
+  
+  // If new password is filled, confirm password is required
+  if (newPassword && !confirmPassword) {
+    return this.createError({
+      path: 'confirmPassword',
+      message: 'Please confirm your new password'
+    });
+  }
+  
+  return true;
 });
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState('');
 
@@ -53,16 +73,18 @@ const Profile: React.FC = () => {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
-    },
+    } as ProfileFormValues,
     validationSchema: validationSchema,
-    onSubmit: async (values) => {
+    onSubmit: async (values: ProfileFormValues, { setSubmitting }: FormikHelpers<ProfileFormValues>) => {
       try {
-        // In a real app, you would make an API call to update the profile
+        await updateProfile(values);
         setSuccess('Profile updated successfully!');
         setTimeout(() => setSuccess(''), 3000);
       } catch (err) {
         setError('Failed to update profile. Please try again.');
         setTimeout(() => setError(''), 3000);
+      } finally {
+        setSubmitting(false);
       }
     },
   });
@@ -137,6 +159,7 @@ const Profile: React.FC = () => {
                   autoComplete="given-name"
                   value={formik.values.firstName}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.firstName && Boolean(formik.errors.firstName)}
                   helperText={formik.touched.firstName && formik.errors.firstName}
                 />
@@ -152,6 +175,7 @@ const Profile: React.FC = () => {
                   autoComplete="family-name"
                   value={formik.values.lastName}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.lastName && Boolean(formik.errors.lastName)}
                   helperText={formik.touched.lastName && formik.errors.lastName}
                 />
@@ -168,15 +192,15 @@ const Profile: React.FC = () => {
                 autoComplete="email"
                 value={formik.values.email}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 error={formik.touched.email && Boolean(formik.errors.email)}
                 helperText={formik.touched.email && formik.errors.email}
               />
             </Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Change Password
-              </Typography>
-            </Box>
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" gutterBottom>
+              Change Password
+            </Typography>
             <Box sx={{ mb: 2 }}>
               <TextField
                 margin="normal"
@@ -187,6 +211,7 @@ const Profile: React.FC = () => {
                 id="currentPassword"
                 value={formik.values.currentPassword}
                 onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 error={formik.touched.currentPassword && Boolean(formik.errors.currentPassword)}
                 helperText={formik.touched.currentPassword && formik.errors.currentPassword}
               />
@@ -202,6 +227,7 @@ const Profile: React.FC = () => {
                   id="newPassword"
                   value={formik.values.newPassword}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.newPassword && Boolean(formik.errors.newPassword)}
                   helperText={formik.touched.newPassword && formik.errors.newPassword}
                 />
@@ -216,6 +242,7 @@ const Profile: React.FC = () => {
                   id="confirmPassword"
                   value={formik.values.confirmPassword}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
                   helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
                 />
@@ -232,6 +259,7 @@ const Profile: React.FC = () => {
               <Button
                 type="submit"
                 variant="contained"
+                disabled={formik.isSubmitting}
               >
                 Save Changes
               </Button>

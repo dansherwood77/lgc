@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface User {
-  id: string;
-  email: string;
+  _id: string;
   firstName: string;
   lastName: string;
+  email: string;
 }
 
 interface AuthContextType {
@@ -13,31 +13,50 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (values: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session/token
     const checkAuth = async () => {
       try {
-        // In a real app, you would verify the token with your backend
         const token = localStorage.getItem('token');
         if (token) {
-          // Mock user data - replace with actual API call
-          setUser({
-            id: '1',
-            email: 'user@example.com',
-            firstName: 'John',
-            lastName: 'Doe',
+          // Make API call to validate token and get user data
+          const response = await fetch('/api/users/profile', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           });
+          if (response.ok) {
+            const userData = await response.json();
+            setUser(userData);
+          } else {
+            localStorage.removeItem('token');
+          }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
+        localStorage.removeItem('token');
       } finally {
         setLoading(false);
       }
@@ -47,21 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
+    const response = await fetch('/api/users/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Invalid credentials');
+    }
+
     try {
-      // In a real app, you would make an API call to your backend
-      // This is a mock implementation
-      if (email && password) {
-        const token = 'mock-token';
-        localStorage.setItem('token', token);
-        setUser({
-          id: '1',
-          email,
-          firstName: 'John',
-          lastName: 'Doe',
-        });
-      } else {
-        throw new Error('Invalid credentials');
-      }
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      setUser(data.user);
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -70,25 +90,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
-      // In a real app, you would make an API call to your backend
-      // This is a mock implementation
-      const token = 'mock-token';
-      localStorage.setItem('token', token);
-      setUser({
-        id: '1',
-        email,
-        firstName,
-        lastName,
+      const response = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, firstName, lastName }),
       });
+
+      if (!response.ok) {
+        throw new Error('Registration failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      setUser(data.user);
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
     }
   };
 
+  const updateProfile = async (values: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const updatedUser = await response.json();
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
-      // In a real app, you would make an API call to your backend
       localStorage.removeItem('token');
       setUser(null);
     } catch (error) {
@@ -103,15 +159,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     register,
     logout,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }; 

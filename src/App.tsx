@@ -37,10 +37,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <Router>
+    <Router>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -93,9 +93,9 @@ function App() {
               }
             />
           </Routes>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </Router>
   );
 }
 
