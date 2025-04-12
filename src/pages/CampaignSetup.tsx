@@ -129,10 +129,45 @@ const CampaignSetup: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      // TODO: Implement API call to create campaign
+      // Combine date and time for start and end dates
+      const startDateTime = new Date(sendDate!);
+      startDateTime.setHours(sendTime!.getHours(), sendTime!.getMinutes());
+      
+      const endDateTime = new Date(sendDate!);
+      endDateTime.setHours(sendTime!.getHours() + 1, sendTime!.getMinutes()); // Assuming 1 hour duration
+
+      const campaignData = {
+        name: `${targetRole} Outreach - ${location}`,
+        description: `Outreach campaign targeting ${targetRole} in ${location} using ${outreachType} meetings`,
+        startDate: startDateTime,
+        endDate: endDateTime,
+        targetRole,
+        location,
+        outreachType,
+        status: 'draft' as const,
+        emailTemplate
+      };
+
+      const response = await fetch('http://localhost:5001/api/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(campaignData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create campaign');
+      }
+
       navigate('/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
+      setErrors(prev => ({
+        ...prev,
+        submit: 'Failed to create campaign. Please try again.'
+      }));
     }
   };
 
@@ -142,16 +177,18 @@ const CampaignSetup: React.FC = () => {
     ));
   };
 
+  const ErrorAlert: React.FC<{ message: string }> = ({ message }) => (
+    <Box sx={{ mb: 2 }}>
+      <Alert severity="error">{message}</Alert>
+    </Box>
+  );
+
   const getStepContent = (step: number) => {
     switch (step) {
       case 0:
         return (
           <Box sx={{ mt: 2 }}>
-            {errors.location && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.location}
-              </Alert>
-            )}
+            {errors.location && <ErrorAlert message={errors.location} />}
             <TextField
               fullWidth
               label="Location"
@@ -166,11 +203,7 @@ const CampaignSetup: React.FC = () => {
               error={!!errors.location}
               sx={{ mb: 3 }}
             />
-            {errors.outreachType && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.outreachType}
-              </Alert>
-            )}
+            {errors.outreachType && <ErrorAlert message={errors.outreachType} />}
             <FormControl component="fieldset" sx={{ mb: 3 }} error={!!errors.outreachType}>
               <RadioGroup
                 value={outreachType}
@@ -199,11 +232,7 @@ const CampaignSetup: React.FC = () => {
       case 1:
         return (
           <Box sx={{ mt: 2 }}>
-            {errors.targetRole && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.targetRole}
-              </Alert>
-            )}
+            {errors.targetRole && <ErrorAlert message={errors.targetRole} />}
             <TextField
               fullWidth
               label="Target Role"
@@ -218,12 +247,8 @@ const CampaignSetup: React.FC = () => {
               error={!!errors.targetRole}
               sx={{ mb: 3 }}
             />
-            {errors.seniority && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.seniority}
-              </Alert>
-            )}
-            <FormControl fullWidth required error={!!errors.seniority}>
+            {errors.seniority && <ErrorAlert message={errors.seniority} />}
+            <FormControl fullWidth sx={{ mb: 3 }} error={!!errors.seniority}>
               <InputLabel>Seniority Level</InputLabel>
               <Select
                 value={seniority}
@@ -248,134 +273,112 @@ const CampaignSetup: React.FC = () => {
       case 2:
         return (
           <Box sx={{ mt: 2 }}>
-            {errors.contacts && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.contacts}
-              </Alert>
-            )}
-            <Typography variant="subtitle1" sx={{ mb: 2 }}>
-              Review and select contacts ({contacts.filter(c => c.selected).length} selected)
-            </Typography>
-            <List>
-              {contacts.map((contact) => (
-                <React.Fragment key={contact.id}>
-                  <ListItem>
+            {errors.contacts && <ErrorAlert message={errors.contacts} />}
+            <Paper sx={{ p: 2 }}>
+              <List>
+                {contacts.map((contact) => (
+                  <ListItem key={contact.id}>
                     <ListItemText
                       primary={contact.name}
                       secondary={`${contact.role} at ${contact.company}`}
                     />
                     <ListItemSecondaryAction>
-                      <IconButton 
-                        edge="end" 
-                        aria-label="select"
-                        onClick={() => {
-                          toggleContactSelection(contact.id);
-                          if (errors.contacts) {
-                            setErrors(prev => ({ ...prev, contacts: '' }));
-                          }
-                        }}
+                      <IconButton
+                        edge="end"
+                        onClick={() => toggleContactSelection(contact.id)}
                       >
-                        {contact.selected ? <CheckIcon color="primary" /> : <EditIcon />}
+                        {contact.selected ? <CheckIcon color="primary" /> : <CloseIcon />}
                       </IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
+                ))}
+              </List>
+            </Paper>
           </Box>
         );
 
       case 3:
         return (
           <Box sx={{ mt: 2 }}>
-            {errors.emailTemplate && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.emailTemplate}
-              </Alert>
-            )}
-            <TextField
-              fullWidth
-              label="Email Template"
-              multiline
-              rows={6}
-              value={emailTemplate}
-              onChange={(e) => {
-                setEmailTemplate(e.target.value);
-                if (errors.emailTemplate) {
-                  setErrors(prev => ({ ...prev, emailTemplate: '' }));
-                }
-              }}
-              required
-              error={!!errors.emailTemplate}
-              placeholder="Write your email template here..."
-              sx={{ mb: 3 }}
-            />
-            <Button
-              variant="outlined"
-              onClick={() => {
-                setEmailTemplate("Hi [Name],\n\nI came across your profile and was impressed by your work at [Company]. I'd love to connect and learn more about your experience in [Role]. Would you be interested in a virtual coffee chat?\n\nBest regards,\n[Your Name]");
-                if (errors.emailTemplate) {
-                  setErrors(prev => ({ ...prev, emailTemplate: '' }));
-                }
-              }}
-              sx={{ mb: 2 }}
-            >
-              Use Template
-            </Button>
+            {errors.emailTemplate && <ErrorAlert message={errors.emailTemplate} />}
+            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+              <TextField
+                fullWidth
+                label="Email Template"
+                value={emailTemplate}
+                onChange={(e) => {
+                  setEmailTemplate(e.target.value);
+                  if (errors.emailTemplate) {
+                    setErrors(prev => ({ ...prev, emailTemplate: '' }));
+                  }
+                }}
+                required
+                error={!!errors.emailTemplate}
+                multiline
+                rows={4}
+              />
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  // Generate a template based on the campaign details
+                  const template = `Hi [Name],
+
+I noticed your role as ${targetRole} at [Company] and would love to connect. I'm reaching out because ${outreachType === 'virtual' ? 'I think a virtual meeting' : 'I think a coffee chat'} would be valuable for both of us.
+
+Would you be open to ${outreachType === 'virtual' ? 'a 30-minute virtual meeting' : 'grabbing coffee'} to discuss potential opportunities?
+
+Best regards,
+[Your Name]`;
+
+                  setEmailTemplate(template);
+                }}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                Generate Template
+              </Button>
+            </Box>
+            {errors.sendDate && <ErrorAlert message={errors.sendDate} />}
             <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                {errors.sendDate && (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {errors.sendDate}
-                  </Alert>
-                )}
-                <DatePicker
-                  label="Send Date"
-                  value={sendDate}
-                  onChange={(newValue) => {
-                    setSendDate(newValue);
-                    if (errors.sendDate) {
-                      setErrors(prev => ({ ...prev, sendDate: '' }));
-                    }
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                {errors.sendTime && (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {errors.sendTime}
-                  </Alert>
-                )}
-                <TimePicker
-                  label="Send Time"
-                  value={sendTime}
-                  onChange={(newValue) => {
-                    setSendTime(newValue);
-                    if (errors.sendTime) {
-                      setErrors(prev => ({ ...prev, sendTime: '' }));
-                    }
-                  }}
-                  sx={{ flex: 1 }}
-                />
-              </Box>
+              <DatePicker
+                label="Send Date"
+                value={sendDate}
+                onChange={(newValue) => {
+                  setSendDate(newValue);
+                  if (errors.sendDate) {
+                    setErrors(prev => ({ ...prev, sendDate: '' }));
+                  }
+                }}
+                sx={{ mb: 3, width: '100%' }}
+              />
+            </LocalizationProvider>
+            {errors.sendTime && <ErrorAlert message={errors.sendTime} />}
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <TimePicker
+                label="Send Time"
+                value={sendTime}
+                onChange={(newValue) => {
+                  setSendTime(newValue);
+                  if (errors.sendTime) {
+                    setErrors(prev => ({ ...prev, sendTime: '' }));
+                  }
+                }}
+                sx={{ mb: 3, width: '100%' }}
+              />
             </LocalizationProvider>
           </Box>
         );
 
       default:
-        return 'Unknown step';
+        return null;
     }
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4">Create New Campaign</Typography>
-          <IconButton onClick={() => setShowExitDialog(true)}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
+    <Container maxWidth="md">
+      <Box sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Create New Campaign
+        </Typography>
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {steps.map((label) => (
             <Step key={label}>
@@ -383,28 +386,36 @@ const CampaignSetup: React.FC = () => {
             </Step>
           ))}
         </Stepper>
+        {errors.submit && <ErrorAlert message={errors.submit} />}
         {getStepContent(activeStep)}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
           <Button
-            disabled={activeStep === 0}
-            onClick={handleBack}
-            sx={{ mr: 1 }}
+            onClick={() => setShowExitDialog(true)}
+            color="inherit"
           >
-            Back
+            Cancel
           </Button>
-          <Button
-            variant="contained"
-            onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-          >
-            {activeStep === steps.length - 1 ? 'Create Campaign' : 'Next'}
-          </Button>
+          <Box>
+            <Button
+              disabled={activeStep === 0}
+              onClick={handleBack}
+              sx={{ mr: 1 }}
+            >
+              Back
+            </Button>
+            <Button
+              variant="contained"
+              onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
+            >
+              {activeStep === steps.length - 1 ? 'Create Campaign' : 'Next'}
+            </Button>
+          </Box>
         </Box>
-      </Paper>
-
+      </Box>
       <Dialog open={showExitDialog} onClose={() => setShowExitDialog(false)}>
         <DialogTitle>Exit Campaign Creation?</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to exit? All progress will be lost.</Typography>
+          Are you sure you want to exit? All progress will be lost.
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowExitDialog(false)}>Cancel</Button>

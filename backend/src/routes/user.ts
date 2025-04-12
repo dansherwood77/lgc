@@ -1,6 +1,6 @@
 import express, { Request } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { auth } from '../middleware/auth';
 
 interface AuthRequest extends Request {
@@ -54,16 +54,37 @@ router.post('/register', async (req: AuthRequest, res) => {
 router.post('/login', async (req: AuthRequest, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
     const user = await User.findOne({ email });
     
-    if (!user || !(await user.comparePassword(password))) {
-      throw new Error();
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET || 'your-secret-key');
-    res.json({ user, token });
+    
+    // Return user data without password
+    const userResponse = {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
+    
+    res.json({ user: userResponse, token });
   } catch (error) {
-    res.status(401).json({ error: 'Login failed' });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
 
@@ -75,7 +96,7 @@ router.get('/profile', auth, async (req: AuthRequest, res) => {
 // Update user profile
 router.put('/profile', auth, async (req: AuthRequest, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = ['firstName', 'lastName', 'email', 'password'];
+  const allowedUpdates = ['firstName', 'lastName', 'email', 'currentPassword', 'newPassword'];
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
   if (!isValidOperation) {
@@ -83,11 +104,65 @@ router.put('/profile', auth, async (req: AuthRequest, res) => {
   }
 
   try {
-    updates.forEach(update => (req.user as any)[update] = req.body[update]);
+    // If updating email, check if it's already taken
+    if (updates.includes('email')) {
+      const existingUser = await User.findOne({ email: req.body.email }).select('_id') as { _id: any } | null;
+      if (existingUser && existingUser._id.toString() !== (req.user as any)._id.toString()) {
+        return res.status(400).json({ error: 'Email is already in use' });
+      }
+    }
+
+    // If updating password, validate current password
+    if (req.body.newPassword) {
+      if (!req.body.currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to change password' });
+      }
+      
+      const isMatch = await req.user.comparePassword(req.body.currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+      
+      // Update password
+      req.user.password = req.body.newPassword;
+    }
+
+    // Update other fields
+    updates.forEach(update => {
+      if (update !== 'currentPassword' && update !== 'newPassword') {
+        (req.user as any)[update] = req.body[update];
+      }
+    });
+    
     await req.user.save();
-    res.json(req.user);
-  } catch (error) {
-    res.status(400).json({ error: 'Update failed' });
+    
+    // Return user data without password
+    const userResponse = {
+      _id: req.user._id,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      email: req.user.email
+    };
+    
+    res.json(userResponse);
+  } catch (error: any) {
+    console.error('Profile update error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.name === 'MongoError' && error.code === 11000) {
+      return res.status(400).json({ error: 'Email is already in use' });
+    }
+    console.error('Detailed error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({ 
+      error: 'Failed to update profile',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

@@ -19,6 +19,7 @@ import {
   DialogContentText,
   DialogActions,
   IconButton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Campaign as CampaignIcon,
@@ -28,58 +29,15 @@ import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-
-interface Campaign {
-  id: number;
-  name: string;
-  targetRole: string;
-  status: 'active' | 'completed' | 'draft';
-  connections: number;
-  responses: number;
-  startDate: string;
-  endDate: string;
-}
-
-const campaigns: Campaign[] = [
-  {
-    id: 1,
-    name: 'Tech Leaders Q1',
-    targetRole: 'Engineering Managers',
-    status: 'active',
-    connections: 12,
-    responses: 5,
-    startDate: '2024-03-01',
-    endDate: '2024-03-31',
-  },
-  {
-    id: 2,
-    name: 'Product Designers',
-    targetRole: 'Senior Designers',
-    status: 'completed',
-    connections: 8,
-    responses: 3,
-    startDate: '2024-02-01',
-    endDate: '2024-02-28',
-  },
-  {
-    id: 3,
-    name: 'Startup Founders',
-    targetRole: 'Founders',
-    status: 'draft',
-    connections: 0,
-    responses: 0,
-    startDate: '2024-04-01',
-    endDate: '2024-04-30',
-  },
-];
+import { useCampaign } from '../contexts/CampaignContext';
 
 const Campaigns: React.FC = () => {
   const navigate = useNavigate();
-  const [campaignsList, setCampaignsList] = useState<Campaign[]>(campaigns);
+  const { campaigns, loading, error, deleteCampaign } = useCampaign();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
 
-  const getStatusChip = (status: Campaign['status']) => {
+  const getStatusChip = (status: string) => {
     switch (status) {
       case 'active':
         return <Chip icon={<PendingIcon />} label="Active" color="primary" size="small" />;
@@ -87,21 +45,27 @@ const Campaigns: React.FC = () => {
         return <Chip icon={<CheckCircleIcon />} label="Completed" color="success" size="small" />;
       case 'draft':
         return <Chip icon={<CancelIcon />} label="Draft" color="default" size="small" />;
+      case 'cancelled':
+        return <Chip icon={<CancelIcon />} label="Cancelled" color="error" size="small" />;
       default:
         return null;
     }
   };
 
-  const handleDeleteClick = (campaign: Campaign) => {
-    setCampaignToDelete(campaign);
+  const handleDeleteClick = (campaignId: string) => {
+    setCampaignToDelete(campaignId);
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (campaignToDelete) {
-      setCampaignsList(campaignsList.filter(campaign => campaign.id !== campaignToDelete.id));
-      setDeleteDialogOpen(false);
-      setCampaignToDelete(null);
+      try {
+        await deleteCampaign(campaignToDelete);
+        setDeleteDialogOpen(false);
+        setCampaignToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete campaign:', error);
+      }
     }
   };
 
@@ -109,6 +73,22 @@ const Campaigns: React.FC = () => {
     setDeleteDialogOpen(false);
     setCampaignToDelete(null);
   };
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography color="error">{error}</Typography>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -126,8 +106,8 @@ const Campaigns: React.FC = () => {
       <Card>
         <CardContent>
           <List>
-            {campaignsList.map((campaign, index) => (
-              <React.Fragment key={campaign.id}>
+            {campaigns.map((campaign, index) => (
+              <React.Fragment key={campaign._id}>
                 <ListItem>
                   <ListItemIcon>
                     <CampaignIcon color="primary" />
@@ -145,10 +125,10 @@ const Campaigns: React.FC = () => {
                           Target Role: {campaign.targetRole}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Connections: {campaign.connections} • Responses: {campaign.responses}
+                          Location: {campaign.location}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Period: {campaign.startDate} to {campaign.endDate}
+                          Period: {new Date(campaign.startDate).toLocaleDateString()} to {new Date(campaign.endDate).toLocaleDateString()}
                         </Typography>
                       </Box>
                     }
@@ -157,14 +137,14 @@ const Campaigns: React.FC = () => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                      onClick={() => navigate(`/campaigns/${campaign._id}`)}
                     >
                       View Details
                     </Button>
                     <IconButton
                       color="error"
                       size="small"
-                      onClick={() => handleDeleteClick(campaign)}
+                      onClick={() => handleDeleteClick(campaign._id)}
                       sx={{ 
                         '&:hover': {
                           backgroundColor: 'error.light',
@@ -176,7 +156,7 @@ const Campaigns: React.FC = () => {
                     </IconButton>
                   </Box>
                 </ListItem>
-                {index < campaignsList.length - 1 && <Divider />}
+                {index < campaigns.length - 1 && <Divider />}
               </React.Fragment>
             ))}
           </List>
@@ -190,7 +170,7 @@ const Campaigns: React.FC = () => {
         <DialogTitle>Delete Campaign</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the campaign "{campaignToDelete?.name}"? This action cannot be undone.
+            Are you sure you want to delete this campaign? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

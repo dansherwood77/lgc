@@ -9,7 +9,7 @@ import campaignRoutes from './routes/campaign';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Connect to MongoDB
 connectDB();

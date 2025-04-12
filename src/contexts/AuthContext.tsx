@@ -19,6 +19,7 @@ interface AuthContextType {
     email: string;
     currentPassword?: string;
     newPassword?: string;
+    confirmPassword?: string;
   }) => Promise<void>;
 }
 
@@ -116,25 +117,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string;
     currentPassword?: string;
     newPassword?: string;
+    confirmPassword?: string;
   }) => {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_URL}/users/profile`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(values),
-    });
+    try {
+      const { confirmPassword, ...updateData } = values;
+      
+      const response = await fetch(`${API_URL}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to update profile');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const updatedUser = await response.json();
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Profile update error:', error);
+      throw error;
     }
-
-    const updatedUser = await response.json();
-    setUser(updatedUser);
   };
 
   const logout = async () => {

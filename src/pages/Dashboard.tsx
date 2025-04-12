@@ -10,103 +10,24 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar,
-  Avatar,
+  ListItemIcon,
   Chip,
   Divider,
-  ListItemIcon,
+  CircularProgress,
 } from '@mui/material';
 import {
   Campaign as CampaignIcon,
-  People as PeopleIcon,
-  Email as EmailIcon,
-  Schedule as ScheduleIcon,
-  Add as AddIcon,
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Cancel as CancelIcon,
-  People,
-  TrendingUp as TrendingUpIcon,
-  Event as EventIcon,
 } from '@mui/icons-material';
-
-// Types for our data
-interface Campaign {
-  id: number;
-  name: string;
-  targetRole: string;
-  status: 'active' | 'completed' | 'draft';
-  connections: number;
-  responses: number;
-}
-
-interface Meeting {
-  id: number;
-  name: string;
-  role: string;
-  date: string;
-  time: string;
-  type: 'virtual' | 'coffee';
-}
-
-// Mock data for demonstration
-const campaignStats = {
-  totalConnections: 42,
-  openRate: '68%',
-  responseRate: '32%',
-  scheduledMeetings: 15,
-};
-
-const recentCampaigns: Campaign[] = [
-  {
-    id: 1,
-    name: 'Tech Leaders Q1',
-    targetRole: 'Engineering Managers',
-    status: 'active',
-    connections: 12,
-    responses: 5,
-  },
-  {
-    id: 2,
-    name: 'Product Designers',
-    targetRole: 'Senior Designers',
-    status: 'completed',
-    connections: 8,
-    responses: 3,
-  },
-  {
-    id: 3,
-    name: 'Startup Founders',
-    targetRole: 'Founders',
-    status: 'draft',
-    connections: 0,
-    responses: 0,
-  },
-];
-
-const upcomingMeetings: Meeting[] = [
-  {
-    id: 1,
-    name: 'Sarah Chen',
-    role: 'Engineering Manager at Google',
-    date: '2024-03-15',
-    time: '10:00 AM',
-    type: 'virtual',
-  },
-  {
-    id: 2,
-    name: 'Michael Rodriguez',
-    role: 'Product Designer at Airbnb',
-    date: '2024-03-16',
-    time: '2:30 PM',
-    type: 'coffee',
-  },
-];
+import { useCampaign } from '../contexts/CampaignContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { campaigns, loading, error } = useCampaign();
 
-  const getStatusChip = (status: Campaign['status']) => {
+  const getStatusChip = (status: string) => {
     switch (status) {
       case 'active':
         return <Chip icon={<PendingIcon />} label="Active" color="primary" size="small" />;
@@ -114,133 +35,92 @@ const Dashboard: React.FC = () => {
         return <Chip icon={<CheckCircleIcon />} label="Completed" color="success" size="small" />;
       case 'draft':
         return <Chip icon={<CancelIcon />} label="Draft" color="default" size="small" />;
+      case 'cancelled':
+        return <Chip icon={<CancelIcon />} label="Cancelled" color="error" size="small" />;
       default:
         return null;
     }
   };
 
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography color="error">{error}</Typography>
+      </Container>
+    );
+  }
+
+  // Get recent campaigns (last 3)
+  const recentCampaigns = [...campaigns]
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+    .slice(0, 3);
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Stats Section */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexWrap: 'wrap', 
-        gap: 3, 
-        mb: 4,
-        '& > *': {
-          flex: '1 1 250px',
-          minWidth: '250px'
-        }
-      }}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" mb={2}>
-              <PeopleIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Total Connections</Typography>
-            </Box>
-            <Typography variant="h4">24</Typography>
-            <Typography color="textSecondary">+5 this week</Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" mb={2}>
-              <EmailIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Open Rate</Typography>
-            </Box>
-            <Typography variant="h4">78%</Typography>
-            <Typography color="textSecondary">+12% from last week</Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" mb={2}>
-              <TrendingUpIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Response Rate</Typography>
-            </Box>
-            <Typography variant="h4">45%</Typography>
-            <Typography color="textSecondary">+8% from last week</Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" mb={2}>
-              <ScheduleIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">Scheduled Meetings</Typography>
-            </Box>
-            <Typography variant="h4">12</Typography>
-            <Typography color="textSecondary">+3 this week</Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      <Typography variant="h4" gutterBottom>
+        Dashboard
+      </Typography>
 
-      {/* Campaigns and Meetings Section */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: { xs: 'column', md: 'row' },
-        gap: 3
-      }}>
-        <Box sx={{ flex: { md: 2 } }}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Recent Campaigns</Typography>
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  onClick={() => navigate('/campaigns')}
-                >
-                  View All
-                </Button>
-              </Box>
-              <List>
-                {recentCampaigns.map((campaign, index) => (
-                  <React.Fragment key={campaign.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CampaignIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={campaign.name}
-                        secondary={`${campaign.connections} connections • ${campaign.status}`}
-                      />
-                    </ListItem>
-                    {index < recentCampaigns.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Box>
-        <Box sx={{ flex: { md: 1 } }}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Upcoming Meetings</Typography>
-                <Button variant="outlined" size="small" onClick={() => navigate('/meetings')}>
-                  View All
-                </Button>
-              </Box>
-              <List>
-                {upcomingMeetings.map((meeting, index) => (
-                  <React.Fragment key={meeting.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <EventIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={meeting.name}
-                        secondary={`${meeting.date} • ${meeting.time}`}
-                      />
-                    </ListItem>
-                    {index < upcomingMeetings.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
+      {/* Recent Campaigns */}
+      <Card>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">Recent Campaigns</Typography>
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={() => navigate('/campaigns')}
+            >
+              View All
+            </Button>
+          </Box>
+          <List>
+            {recentCampaigns.map((campaign, index) => (
+              <React.Fragment key={campaign._id}>
+                <ListItem>
+                  <ListItemIcon>
+                    <CampaignIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="subtitle1">{campaign.name}</Typography>
+                        {getStatusChip(campaign.status)}
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Target Role: {campaign.targetRole}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Location: {campaign.location}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => navigate(`/campaigns/${campaign._id}`)}
+                  >
+                    View Details
+                  </Button>
+                </ListItem>
+                {index < recentCampaigns.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        </CardContent>
+      </Card>
     </Container>
   );
 };
