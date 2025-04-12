@@ -27,7 +27,6 @@ import {
   Pending as PendingIcon,
   Event as EventIcon,
   Delete as DeleteIcon,
-  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useCampaign } from '../contexts/CampaignContext';
 
@@ -133,13 +132,6 @@ const CampaignDetails: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={() => navigate(`/campaigns/${id}/edit`)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="outlined"
             color="error"
             startIcon={<DeleteIcon />}
             onClick={() => setOpenDialog(true)}
@@ -169,28 +161,11 @@ const CampaignDetails: React.FC = () => {
                 <Typography variant="subtitle1" color="text.secondary">Outreach Type</Typography>
                 <Typography>{campaign.outreachType}</Typography>
               </Box>
-              <Box>
-                <Typography variant="subtitle1" color="text.secondary">Status</Typography>
-                <Chip
-                  label={campaign.status}
-                  color={
-                    campaign.status === 'active'
-                      ? 'primary'
-                      : campaign.status === 'completed'
-                      ? 'success'
-                      : 'default'
-                  }
-                />
-              </Box>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               <Box>
-                <Typography variant="subtitle1" color="text.secondary">Start Date</Typography>
+                <Typography variant="subtitle1" color="text.secondary">Date Created</Typography>
                 <Typography>{new Date(campaign.startDate).toLocaleDateString()}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" color="text.secondary">End Date</Typography>
-                <Typography>{new Date(campaign.endDate).toLocaleDateString()}</Typography>
               </Box>
             </Box>
           </Box>

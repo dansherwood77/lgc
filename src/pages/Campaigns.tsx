@@ -43,8 +43,6 @@ const Campaigns: React.FC = () => {
         return <Chip icon={<PendingIcon />} label="Active" color="primary" size="small" />;
       case 'completed':
         return <Chip icon={<CheckCircleIcon />} label="Completed" color="success" size="small" />;
-      case 'draft':
-        return <Chip icon={<CancelIcon />} label="Draft" color="default" size="small" />;
       case 'cancelled':
         return <Chip icon={<CancelIcon />} label="Cancelled" color="error" size="small" />;
       default:
@@ -128,7 +126,7 @@ const Campaigns: React.FC = () => {
                           Location: {campaign.location}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Period: {new Date(campaign.startDate).toLocaleDateString()} to {new Date(campaign.endDate).toLocaleDateString()}
+                          Date Created: {new Date(campaign.startDate).toLocaleDateString()}
                         </Typography>
                       </Box>
                     }

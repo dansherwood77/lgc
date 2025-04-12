@@ -33,8 +33,6 @@ const Dashboard: React.FC = () => {
         return <Chip icon={<PendingIcon />} label="Active" color="primary" size="small" />;
       case 'completed':
         return <Chip icon={<CheckCircleIcon />} label="Completed" color="success" size="small" />;
-      case 'draft':
-        return <Chip icon={<CancelIcon />} label="Draft" color="default" size="small" />;
       case 'cancelled':
         return <Chip icon={<CancelIcon />} label="Cancelled" color="error" size="small" />;
       default:
@@ -119,6 +117,27 @@ const Dashboard: React.FC = () => {
               </React.Fragment>
             ))}
           </List>
+        </CardContent>
+      </Card>
+
+      {/* Upcoming Meetings */}
+      <Card sx={{ mt: 4 }}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">Upcoming Meetings</Typography>
+            <Button 
+              variant="outlined" 
+              size="small"
+              disabled
+            >
+              View All
+            </Button>
+          </Box>
+          <Box sx={{ py: 4, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              No upcoming meetings scheduled
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
     </Container>
