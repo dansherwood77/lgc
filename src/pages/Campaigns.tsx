@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -13,6 +13,12 @@ import {
   ListItemIcon,
   Divider,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  IconButton,
 } from '@mui/material';
 import {
   Campaign as CampaignIcon,
@@ -20,6 +26,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Cancel as CancelIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 
 interface Campaign {
@@ -68,6 +75,9 @@ const campaigns: Campaign[] = [
 
 const Campaigns: React.FC = () => {
   const navigate = useNavigate();
+  const [campaignsList, setCampaignsList] = useState<Campaign[]>(campaigns);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
 
   const getStatusChip = (status: Campaign['status']) => {
     switch (status) {
@@ -80,6 +90,24 @@ const Campaigns: React.FC = () => {
       default:
         return null;
     }
+  };
+
+  const handleDeleteClick = (campaign: Campaign) => {
+    setCampaignToDelete(campaign);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (campaignToDelete) {
+      setCampaignsList(campaignsList.filter(campaign => campaign.id !== campaignToDelete.id));
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setCampaignToDelete(null);
   };
 
   return (
@@ -98,7 +126,7 @@ const Campaigns: React.FC = () => {
       <Card>
         <CardContent>
           <List>
-            {campaigns.map((campaign, index) => (
+            {campaignsList.map((campaign, index) => (
               <React.Fragment key={campaign.id}>
                 <ListItem>
                   <ListItemIcon>
@@ -125,20 +153,53 @@ const Campaigns: React.FC = () => {
                       </Box>
                     }
                   />
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => navigate(`/campaigns/${campaign.id}`)}
-                  >
-                    View Details
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                    >
+                      View Details
+                    </Button>
+                    <IconButton
+                      color="error"
+                      size="small"
+                      onClick={() => handleDeleteClick(campaign)}
+                      sx={{ 
+                        '&:hover': {
+                          backgroundColor: 'error.light',
+                          color: 'white'
+                        }
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
                 </ListItem>
-                {index < campaigns.length - 1 && <Divider />}
+                {index < campaignsList.length - 1 && <Divider />}
               </React.Fragment>
             ))}
           </List>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+      >
+        <DialogTitle>Delete Campaign</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the campaign "{campaignToDelete?.name}"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
