@@ -41,22 +41,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          // Make API call to validate token and get user data
-          const response = await fetch('/api/users/profile', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-          } else {
-            localStorage.removeItem('token');
-          }
+          // Bypass token validation and set mock user
+          const mockUser = {
+            _id: '1',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com'
+          };
+          setUser(mockUser);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
       } finally {
         setLoading(false);
       }
@@ -66,26 +61,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch('/api/users/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Invalid credentials');
-    }
-
-    try {
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      setUser(data.user);
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
+    // Bypass credential checking and automatically log in
+    const mockUser = {
+      _id: '1',
+      firstName: 'Test',
+      lastName: 'User',
+      email: email
+    };
+    
+    localStorage.setItem('token', 'mock-token');
+    setUser(mockUser);
   };
 
   const register = async (email: string, password: string, firstName: string, lastName: string) => {

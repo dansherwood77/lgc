@@ -31,7 +31,7 @@ import {
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateRangePicker } from '@mui/x-date-pickers-pro/DateRangePicker';
-import { DateRange } from '@mui/x-date-pickers-pro/models';
+import { DateRange } from '@mui/x-date-pickers-pro';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 
 interface User {
