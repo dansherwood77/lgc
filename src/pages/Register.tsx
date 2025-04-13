@@ -10,6 +10,7 @@ import {
   Button,
   Alert,
   Link as MuiLink,
+  Divider,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,6 +20,8 @@ interface RegisterFormValues {
   email: string;
   password: string;
   confirmPassword: string;
+  linkedinEmail: string;
+  linkedinPassword: string;
 }
 
 const Register: React.FC = () => {
@@ -33,6 +36,8 @@ const Register: React.FC = () => {
       email: '',
       password: '',
       confirmPassword: '',
+      linkedinEmail: '',
+      linkedinPassword: '',
     } as RegisterFormValues,
     validationSchema: Yup.object({
       firstName: Yup.string().required('Required'),
@@ -44,10 +49,19 @@ const Register: React.FC = () => {
       confirmPassword: Yup.string()
         .oneOf([Yup.ref('password')], 'Passwords must match')
         .required('Required'),
+      linkedinEmail: Yup.string().email('Invalid LinkedIn email address').required('Required'),
+      linkedinPassword: Yup.string().required('LinkedIn password is required'),
     }),
     onSubmit: async (values: RegisterFormValues, { setSubmitting }: FormikHelpers<RegisterFormValues>) => {
       try {
-        await register(values.email, values.password, values.firstName, values.lastName);
+        await register(
+          values.email,
+          values.password,
+          values.firstName,
+          values.lastName,
+          values.linkedinEmail,
+          values.linkedinPassword
+        );
         navigate('/dashboard');
       } catch (err) {
         setError('Failed to create an account. Please try again.');
@@ -147,6 +161,38 @@ const Register: React.FC = () => {
             onBlur={formik.handleBlur}
             error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
             helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
+          />
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" gutterBottom>
+            LinkedIn Credentials
+          </Typography>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="linkedinEmail"
+            label="LinkedIn Email"
+            name="linkedinEmail"
+            autoComplete="email"
+            value={formik.values.linkedinEmail}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            error={formik.touched.linkedinEmail && Boolean(formik.errors.linkedinEmail)}
+            helperText={formik.touched.linkedinEmail && formik.errors.linkedinEmail}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="linkedinPassword"
+            label="LinkedIn Password"
+            type="password"
+            id="linkedinPassword"
+            value={formik.values.linkedinPassword}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            error={formik.touched.linkedinPassword && Boolean(formik.errors.linkedinPassword)}
+            helperText={formik.touched.linkedinPassword && formik.errors.linkedinPassword}
           />
           <Button
             type="submit"

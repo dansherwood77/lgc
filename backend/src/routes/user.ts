@@ -12,10 +12,10 @@ const router = express.Router();
 // Register a new user
 router.post('/register', async (req: AuthRequest, res) => {
   try {
-    const { firstName, lastName, email, password } = req.body;
+    const { firstName, lastName, email, password, linkedinEmail, linkedinPassword } = req.body;
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email || !password || !linkedinEmail || !linkedinPassword) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -26,18 +26,19 @@ router.post('/register', async (req: AuthRequest, res) => {
     }
 
     // Create new user
-    const user = new User({ firstName, lastName, email, password });
+    const user = new User({ firstName, lastName, email, password, linkedinEmail, linkedinPassword });
     await user.save();
     
     // Generate JWT token
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET || 'your-secret-key');
     
-    // Return user data (excluding password) and token
+    // Return user data (excluding passwords) and token
     const userResponse = {
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email
+      email: user.email,
+      linkedinEmail: user.linkedinEmail
     };
     
     res.status(201).json({ user: userResponse, token });

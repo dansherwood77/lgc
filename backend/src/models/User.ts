@@ -6,6 +6,8 @@ export interface IUser extends Document {
   lastName: string;
   email: string;
   password: string;
+  linkedinEmail?: string;
+  linkedinPassword?: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -13,7 +15,9 @@ const UserSchema = new Schema<IUser>({
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  password: { type: String, required: true },
+  linkedinEmail: { type: String },
+  linkedinPassword: { type: String }
 });
 
 // Hash password before saving

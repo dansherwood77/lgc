@@ -11,7 +11,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  register: (email: string, password: string, firstName: string, lastName: string, linkedinEmail: string, linkedinPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (values: {
     firstName: string;
@@ -85,14 +85,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
   };
 
-  const register = async (email: string, password: string, firstName: string, lastName: string) => {
+  const register = async (email: string, password: string, firstName: string, lastName: string, linkedinEmail: string, linkedinPassword: string) => {
     try {
       const response = await fetch(`${API_URL}/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, firstName, lastName }),
+        body: JSON.stringify({ email, password, firstName, lastName, linkedinEmail, linkedinPassword }),
       });
 
       if (!response.ok) {
