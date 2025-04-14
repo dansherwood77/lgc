@@ -11,6 +11,13 @@ const router = express.Router();
 // Create a new campaign
 router.post('/', auth, async (req: AuthRequest, res) => {
   try {
+    const requiredFields = ['name', 'description', 'startDate', 'endDate', 'targetRole', 'location', 'seniority', 'outreachType'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
+    }
+
     const campaign = new Campaign({
       ...req.body,
       createdBy: req.user._id
@@ -25,9 +32,12 @@ router.post('/', auth, async (req: AuthRequest, res) => {
 // Get all campaigns for the authenticated user
 router.get('/', auth, async (req: AuthRequest, res) => {
   try {
+    console.log('Fetching campaigns for user:', req.user._id);
     const campaigns = await Campaign.find({ createdBy: req.user._id });
+    console.log('Found campaigns:', campaigns.length);
     res.json(campaigns);
   } catch (error) {
+    console.error('Error fetching campaigns:', error);
     res.status(500).json({ error: 'Failed to fetch campaigns' });
   }
 });
@@ -60,9 +70,11 @@ router.put('/:id', auth, async (req: AuthRequest, res) => {
     'endDate',
     'targetRole',
     'location',
+    'seniority',
     'outreachType',
     'status',
-    'linkedinSearchResults'
+    'linkedinSearchResults',
+    'emailTemplate'
   ];
   
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));

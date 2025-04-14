@@ -22,6 +22,8 @@ interface ProfileFormValues {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
+  linkedinEmail: string;
+  linkedinPassword: string;
 }
 
 const validationSchema = Yup.object({
@@ -36,7 +38,10 @@ const validationSchema = Yup.object({
   newPassword: Yup.string()
     .min(8, 'Password should be of minimum 8 characters length'),
   confirmPassword: Yup.string()
-    .oneOf([Yup.ref('newPassword')], 'Passwords must match')
+    .oneOf([Yup.ref('newPassword')], 'Passwords must match'),
+  linkedinEmail: Yup.string()
+    .email('Enter a valid LinkedIn email'),
+  linkedinPassword: Yup.string()
 }).test('password-change-validation', 'Password change requires current password', function(value) {
   const { newPassword, confirmPassword, currentPassword } = value;
   
@@ -73,6 +78,8 @@ const Profile: React.FC = () => {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
+      linkedinEmail: user?.linkedinEmail || '',
+      linkedinPassword: user?.linkedinPassword || ''
     } as ProfileFormValues,
     validationSchema: validationSchema,
     onSubmit: async (values: ProfileFormValues, { setSubmitting }: FormikHelpers<ProfileFormValues>) => {
@@ -195,6 +202,39 @@ const Profile: React.FC = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.email && Boolean(formik.errors.email)}
                 helperText={formik.touched.email && formik.errors.email}
+              />
+            </Box>
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" gutterBottom>
+              LinkedIn Credentials
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                margin="normal"
+                fullWidth
+                id="linkedinEmail"
+                label="LinkedIn Email"
+                name="linkedinEmail"
+                value={formik.values.linkedinEmail}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.linkedinEmail && Boolean(formik.errors.linkedinEmail)}
+                helperText={formik.touched.linkedinEmail && formik.errors.linkedinEmail}
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                margin="normal"
+                fullWidth
+                id="linkedinPassword"
+                label="LinkedIn Password"
+                name="linkedinPassword"
+                type="password"
+                value={formik.values.linkedinPassword}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.linkedinPassword && Boolean(formik.errors.linkedinPassword)}
+                helperText={formik.touched.linkedinPassword && formik.errors.linkedinPassword}
               />
             </Box>
             <Divider sx={{ my: 3 }} />

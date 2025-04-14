@@ -13,40 +13,22 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
   Paper,
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   IconButton,
-  Chip,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Alert,
-  CircularProgress,
-  Pagination,
   ListItemAvatar,
   Avatar,
+  Tabs,
+  Tab,
 } from '@mui/material';
-import {
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
-  Search as SearchIcon,
-  Add as AddIcon,
-} from '@mui/icons-material';
+import { Close as CloseIcon } from '@mui/icons-material';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ICampaign } from '../types';
+import LinkedInScraper from '../components/LinkedInScraper';
 
 const steps = [
   'Location & Outreach Type',
@@ -55,15 +37,15 @@ const steps = [
   'Email & Schedule',
 ];
 
-const seniorityLevels = ['Entry Level', 'Associate', 'Mid-Senior Level', 'Director', 'Executive'];
-
 interface Contact {
   id: number;
   name: string;
   role: string;
   company: string;
   selected: boolean;
-  profilePicture?: string;
+  profilePicture: string;
+  location?: string;
+  linkedinUrl?: string;
 }
 
 const CampaignSetup: React.FC = () => {
@@ -77,14 +59,9 @@ const CampaignSetup: React.FC = () => {
   const [sendDate, setSendDate] = useState<Date | null>(null);
   const [sendTime, setSendTime] = useState<Date | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [showExitDialog, setShowExitDialog] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [searching, setSearching] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalResults, setTotalResults] = useState(0);
   const [campaignId, setCampaignId] = useState<string | null>(null);
-  const pageSize = 10;
+  const [activeTab, setActiveTab] = useState(0);
 
   const validateStep = (step: number): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -173,19 +150,22 @@ const CampaignSetup: React.FC = () => {
         switch (activeStep) {
           case 0:
             if (!campaignId) {
-              // Initial campaign creation
-              await updateCampaign({
+              const newCampaign = await updateCampaign({
                 name: `${outreachType} Outreach - ${location}`,
                 description: `Outreach campaign in ${location} using ${outreachType} meetings`,
                 startDate: new Date(),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-                targetRole: 'To be determined', // Initial value
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                targetRole: 'To be determined',
                 location,
                 outreachType,
+                seniority: 'mid',
                 status: 'draft'
               });
+              
+              if (newCampaign && newCampaign._id) {
+                setCampaignId(newCampaign._id);
+              }
             } else {
-              // Update existing campaign
               await updateCampaign({
                 location,
                 outreachType
@@ -195,41 +175,7 @@ const CampaignSetup: React.FC = () => {
           case 1:
             await updateCampaign({
               targetRole,
-              linkedinSearchResults: {
-                contacts: [],
-                total: 0,
-                currentPage: 1,
-                pageSize: 10,
-                totalPages: 0,
-                searchParams: {
-                  location,
-                  targetRole,
-                  seniority
-                },
-                lastUpdated: new Date()
-              },
-              status: 'draft'
-            });
-            break;
-          case 2:
-            await updateCampaign({
-              linkedinSearchResults: {
-                contacts: contacts.map(contact => ({
-                  ...contact,
-                  profilePicture: contact.profilePicture || ''
-                })),
-                total: totalResults,
-                currentPage,
-                pageSize,
-                totalPages,
-                searchParams: {
-                  location,
-                  targetRole,
-                  seniority
-                },
-                lastUpdated: new Date()
-              },
-              status: 'draft'
+              seniority
             });
             break;
         }
@@ -255,7 +201,7 @@ const CampaignSetup: React.FC = () => {
       endDateTime.setHours(sendTime!.getHours() + 1, sendTime!.getMinutes());
 
       await updateCampaign({
-        name: `${targetRole} Outreach - ${location}`,
+        name: `LinkedIn Outreach - ${location}`,
         description: `Outreach campaign targeting ${targetRole} in ${location} using ${outreachType} meetings`,
         startDate: startDateTime,
         endDate: endDateTime,
@@ -275,79 +221,6 @@ const CampaignSetup: React.FC = () => {
     ));
   };
 
-  const searchLinkedIn = async (page: number = 1) => {
-    try {
-      setSearching(true);
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-
-      const response = await fetch('http://localhost:5001/api/linkedin/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          location, 
-          targetRole, 
-          seniority,
-          page,
-          pageSize,
-          campaignId
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to search LinkedIn');
-      }
-
-      const data = await response.json();
-      const newContacts = data.contacts.map((contact: any, index: number) => ({
-        ...contact,
-        id: (page - 1) * pageSize + index + 1,
-        selected: false,
-        profilePicture: contact.profilePicture || ''
-      }));
-      
-      setContacts(newContacts);
-      setTotalPages(data.totalPages);
-      setTotalResults(data.total);
-      setCurrentPage(page);
-
-      // Update campaign with new search results
-      if (campaignId) {
-        await updateCampaign({
-          linkedinSearchResults: {
-            contacts: newContacts,
-            total: data.total,
-            currentPage: page,
-            pageSize,
-            totalPages: data.totalPages,
-            searchParams: {
-              location,
-              targetRole,
-              seniority
-            },
-            lastUpdated: new Date()
-          }
-        });
-      }
-    } catch (error) {
-      console.error('LinkedIn search error:', error);
-      setErrors(prev => ({
-        ...prev,
-        linkedin: 'Failed to search LinkedIn. Please try again.'
-      }));
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    event.preventDefault(); // Prevent default anchor behavior
-    searchLinkedIn(value);
-  };
-
   const ErrorAlert: React.FC<{ message: string }> = ({ message }) => (
     <Box sx={{ mb: 2 }}>
       <Alert severity="error">{message}</Alert>
@@ -358,231 +231,123 @@ const CampaignSetup: React.FC = () => {
     switch (step) {
       case 0:
         return (
-          <Box sx={{ mt: 2 }}>
-            {errors.location && <ErrorAlert message={errors.location} />}
-            <TextField
-              fullWidth
-              label="Location"
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
-                if (errors.location) {
-                  setErrors(prev => ({ ...prev, location: '' }));
-                }
-              }}
-              required
-              error={!!errors.location}
-              sx={{ mb: 3 }}
-            />
-            {errors.outreachType && <ErrorAlert message={errors.outreachType} />}
-            <FormControl component="fieldset" sx={{ mb: 3 }} error={!!errors.outreachType}>
-              <RadioGroup
+          <Box sx={{ mt: 3 }}>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <TextField
+                label="Location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                fullWidth
+              />
+              {errors.location && <ErrorAlert message={errors.location} />}
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Outreach Type</InputLabel>
+              <Select
                 value={outreachType}
-                onChange={(e) => {
-                  setOutreachType(e.target.value);
-                  if (errors.outreachType) {
-                    setErrors(prev => ({ ...prev, outreachType: '' }));
-                  }
-                }}
+                onChange={(e) => setOutreachType(e.target.value)}
+                label="Outreach Type"
               >
-                <FormControlLabel
-                  value="virtual"
-                  control={<Radio />}
-                  label="Virtual (Zoom/Google Meet)"
-                />
-                <FormControlLabel
-                  value="in-person"
-                  control={<Radio />}
-                  label="In-person Coffee Meeting"
-                />
-              </RadioGroup>
+                <MenuItem value="virtual">Virtual Meeting</MenuItem>
+                <MenuItem value="in-person">In-Person Meeting</MenuItem>
+              </Select>
+              {errors.outreachType && <ErrorAlert message={errors.outreachType} />}
             </FormControl>
           </Box>
         );
 
       case 1:
         return (
-          <Box sx={{ mt: 2 }}>
-            {errors.targetRole && <ErrorAlert message={errors.targetRole} />}
-            <TextField
-              fullWidth
-              label="Target Role"
-              value={targetRole}
-              onChange={(e) => {
-                setTargetRole(e.target.value);
-                if (errors.targetRole) {
-                  setErrors(prev => ({ ...prev, targetRole: '' }));
-                }
-              }}
-              required
-              error={!!errors.targetRole}
-              sx={{ mb: 3 }}
-            />
-            {errors.seniority && <ErrorAlert message={errors.seniority} />}
-            <FormControl fullWidth sx={{ mb: 3 }} error={!!errors.seniority}>
+          <Box sx={{ mt: 3 }}>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <TextField
+                label="Target Role"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                fullWidth
+              />
+              {errors.targetRole && <ErrorAlert message={errors.targetRole} />}
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Seniority Level</InputLabel>
               <Select
                 value={seniority}
-                onChange={(e) => {
-                  setSeniority(e.target.value);
-                  if (errors.seniority) {
-                    setErrors(prev => ({ ...prev, seniority: '' }));
-                  }
-                }}
+                onChange={(e) => setSeniority(e.target.value)}
                 label="Seniority Level"
               >
-                {seniorityLevels.map((level) => (
-                  <MenuItem key={level} value={level}>
-                    {level}
-                  </MenuItem>
-                ))}
+                <MenuItem value="entry">Entry Level</MenuItem>
+                <MenuItem value="mid">Mid Level</MenuItem>
+                <MenuItem value="senior">Senior Level</MenuItem>
+                <MenuItem value="executive">Executive Level</MenuItem>
               </Select>
+              {errors.seniority && <ErrorAlert message={errors.seniority} />}
             </FormControl>
+
+            {campaignId && (
+              <LinkedInScraper campaignId={campaignId} />
+            )}
           </Box>
         );
 
       case 2:
         return (
-          <Box sx={{ mt: 2 }}>
-            {errors.contacts && <ErrorAlert message={errors.contacts} />}
-            {errors.linkedin && <ErrorAlert message={errors.linkedin} />}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-              <Typography variant="h6">Review Contacts</Typography>
-              <Button
-                variant="contained"
-                onClick={() => searchLinkedIn(1)}
-                disabled={searching || !location || !targetRole || !seniority}
-                startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
-              >
-                {searching ? 'Searching...' : 'Search LinkedIn'}
-              </Button>
-            </Box>
-            <Paper>
-              <List>
-                {contacts.map((contact) => (
-                  <ListItem
-                    key={contact.id}
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        onClick={() => toggleContactSelection(contact.id)}
-                      >
-                        {contact.selected ? <CheckIcon color="primary" /> : <AddIcon />}
-                      </IconButton>
-                    }
-                  >
-                    <ListItemAvatar>
-                      {contact.profilePicture ? (
-                        <Avatar src={contact.profilePicture} alt={contact.name} />
-                      ) : (
-                        <Avatar>{contact.name.charAt(0)}</Avatar>
-                      )}
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={contact.name}
-                      secondary={
-                        <>
-                          <Typography component="span" variant="body2" color="text.primary">
-                            {contact.role}
-                          </Typography>
-                          {` — ${contact.company}`}
-                        </>
-                      }
-                    />
-                  </ListItem>
-                ))}
-                {contacts.length === 0 && (
-                  <ListItem>
-                    <ListItemText
-                      primary="No contacts found"
-                      secondary="Use the search button to find contacts on LinkedIn"
-                    />
-                  </ListItem>
-                )}
-              </List>
-              {totalResults > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                  <Pagination
-                    count={totalPages}
-                    page={currentPage}
-                    onChange={handlePageChange}
-                    color="primary"
-                    disabled={searching}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Review Selected Contacts
+            </Typography>
+            <List>
+              {contacts.filter(c => c.selected).map((contact) => (
+                <ListItem key={contact.id}>
+                  <ListItemAvatar>
+                    <Avatar src={contact.profilePicture} />
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={contact.name}
+                    secondary={`${contact.role} at ${contact.company}`}
                   />
-                </Box>
-              )}
-            </Paper>
+                  <IconButton onClick={() => toggleContactSelection(contact.id)}>
+                    <CloseIcon />
+                  </IconButton>
+                </ListItem>
+              ))}
+            </List>
+            {errors.contacts && <ErrorAlert message={errors.contacts} />}
           </Box>
         );
 
       case 3:
         return (
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 3 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="Email Template"
+              value={emailTemplate}
+              onChange={(e) => setEmailTemplate(e.target.value)}
+              sx={{ mb: 3 }}
+            />
             {errors.emailTemplate && <ErrorAlert message={errors.emailTemplate} />}
+
             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-              <TextField
-                fullWidth
-                label="Email Template"
-                value={emailTemplate}
-                onChange={(e) => {
-                  setEmailTemplate(e.target.value);
-                  if (errors.emailTemplate) {
-                    setErrors(prev => ({ ...prev, emailTemplate: '' }));
-                  }
-                }}
-                required
-                error={!!errors.emailTemplate}
-                multiline
-                rows={4}
-              />
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  // Generate a template based on the campaign details
-                  const template = `Hi [Name],
-
-I noticed your role as ${targetRole} at [Company] and would love to connect. I'm reaching out because ${outreachType === 'virtual' ? 'I think a virtual meeting' : 'I think a coffee chat'} would be valuable for both of us.
-
-Would you be open to ${outreachType === 'virtual' ? 'a 30-minute virtual meeting' : 'grabbing coffee'} to discuss potential opportunities?
-
-Best regards,
-[Your Name]`;
-
-                  setEmailTemplate(template);
-                }}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                Generate Template
-              </Button>
-            </Box>
-            {errors.sendDate && <ErrorAlert message={errors.sendDate} />}
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 label="Send Date"
                 value={sendDate}
-                onChange={(newValue) => {
-                  setSendDate(newValue);
-                  if (errors.sendDate) {
-                    setErrors(prev => ({ ...prev, sendDate: '' }));
-                  }
-                }}
-                sx={{ mb: 3, width: '100%' }}
+                onChange={(newValue) => setSendDate(newValue)}
+                sx={{ flex: 1 }}
               />
-            </LocalizationProvider>
-            {errors.sendTime && <ErrorAlert message={errors.sendTime} />}
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              {errors.sendDate && <ErrorAlert message={errors.sendDate} />}
+
               <TimePicker
                 label="Send Time"
                 value={sendTime}
-                onChange={(newValue) => {
-                  setSendTime(newValue);
-                  if (errors.sendTime) {
-                    setErrors(prev => ({ ...prev, sendTime: '' }));
-                  }
-                }}
-                sx={{ mb: 3, width: '100%' }}
+                onChange={(newValue) => setSendTime(newValue)}
+                sx={{ flex: 1 }}
               />
-            </LocalizationProvider>
+              {errors.sendTime && <ErrorAlert message={errors.sendTime} />}
+            </Box>
           </Box>
         );
 
@@ -591,57 +356,73 @@ Best regards,
     }
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   return (
-    <Container maxWidth="md">
-      <Box sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="lg">
+      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Create New Campaign
         </Typography>
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        {errors.submit && <ErrorAlert message={errors.submit} />}
-        {getStepContent(activeStep)}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-          <Button
-            onClick={() => setShowExitDialog(true)}
-            color="inherit"
-          >
-            Cancel
-          </Button>
+        
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label="campaign setup tabs" sx={{ mb: 3 }}>
+          <Tab label="Campaign Setup" />
+          <Tab label="LinkedIn Search" />
+        </Tabs>
+        
+        {activeTab === 0 && (
+          <>
+            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+            {errors.submit && <ErrorAlert message={errors.submit} />}
+            {getStepContent(activeStep)}
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                variant="outlined"
+              >
+                Back
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={
+                  activeStep === steps.length - 1 ? handleSubmit : handleNext
+                }
+              >
+                {activeStep === steps.length - 1 ? 'Submit' : 'Next'}
+              </Button>
+            </Box>
+          </>
+        )}
+        
+        {activeTab === 1 && (
           <Box>
-            <Button
-              disabled={activeStep === 0}
-              onClick={handleBack}
-              sx={{ mr: 1 }}
-            >
-              Back
-            </Button>
-            <Button
-              variant="contained"
-              onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-            >
-              {activeStep === steps.length - 1 ? 'Create Campaign' : 'Next'}
-            </Button>
+            <Typography variant="h6" component="h2" gutterBottom>
+              LinkedIn Search
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Use our LinkedIn search to find potential contacts based on their roles and experience.
+            </Typography>
+            {campaignId ? (
+              <LinkedInScraper campaignId={campaignId} />
+            ) : (
+              <Alert severity="info">
+                Please save your campaign first to use this feature.
+              </Alert>
+            )}
           </Box>
-        </Box>
-      </Box>
-      <Dialog open={showExitDialog} onClose={() => setShowExitDialog(false)}>
-        <DialogTitle>Exit Campaign Creation?</DialogTitle>
-        <DialogContent>
-          Are you sure you want to exit? All progress will be lost.
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowExitDialog(false)}>Cancel</Button>
-          <Button onClick={() => navigate('/campaigns')} color="error">
-            Exit
-          </Button>
-        </DialogActions>
-      </Dialog>
+        )}
+      </Paper>
     </Container>
   );
 };

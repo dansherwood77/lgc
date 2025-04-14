@@ -1,10 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 interface User {
   _id: string;
   firstName: string;
   lastName: string;
   email: string;
+  linkedinEmail?: string;
+  linkedinPassword?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthContextType {
@@ -13,13 +18,14 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string, linkedinEmail: string, linkedinPassword: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (values: {
-    firstName: string;
-    lastName: string;
-    email: string;
+  updateProfile: (data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
     currentPassword?: string;
     newPassword?: string;
-    confirmPassword?: string;
+    linkedinEmail?: string;
+    linkedinPassword?: string;
   }) => Promise<void>;
 }
 
@@ -87,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, password: string, firstName: string, lastName: string, linkedinEmail: string, linkedinPassword: string) => {
     try {
+      console.log('Attempting registration with data:', { email, firstName, lastName, linkedinEmail });
       const response = await fetch(`${API_URL}/users/register`, {
         method: 'POST',
         headers: {
@@ -97,13 +104,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Registration failed:', errorData);
         throw new Error(errorData.error || 'Registration failed');
       }
 
       const data = await response.json();
+      console.log('Registration successful:', data);
       localStorage.setItem('token', data.token);
       setUser(data.user);
     } catch (error) {
+      console.error('Registration error:', error);
       if (error instanceof Error) {
         throw new Error(error.message);
       }
@@ -111,38 +121,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (values: {
-    firstName: string;
-    lastName: string;
-    email: string;
+  const updateProfile = async (data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
     currentPassword?: string;
     newPassword?: string;
-    confirmPassword?: string;
+    linkedinEmail?: string;
+    linkedinPassword?: string;
   }) => {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Not authenticated');
 
     try {
-      const { confirmPassword, ...updateData } = values;
-      
-      const response = await fetch(`${API_URL}/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(updateData),
+      console.log('Sending profile update request:', data);
+      const response = await axios.put(`${API_URL}/users/profile`, data, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
-      }
-
-      const updatedUser = await response.json();
-      setUser(updatedUser);
+      
+      console.log('Profile update response:', response.data);
+      setUser(response.data);
+      return response.data;
     } catch (error) {
       console.error('Profile update error:', error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.error || 'Failed to update profile');
+      }
       throw error;
     }
   };

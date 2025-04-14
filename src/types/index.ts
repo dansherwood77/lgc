@@ -1,12 +1,11 @@
-export interface User {
-  _id: string;
+export interface IUser {
+  _id?: string;
   firstName: string;
   lastName: string;
   email: string;
-  linkedinEmail?: string;
-  linkedinPassword?: string;
-  createdAt: string;
-  updatedAt: string;
+  password?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface ICampaign {
@@ -17,6 +16,7 @@ export interface ICampaign {
   endDate: Date;
   targetRole: string;
   location: string;
+  seniority: string;
   outreachType: string;
   createdBy: string;
   status: 'draft' | 'active' | 'paused' | 'completed';
@@ -27,6 +27,8 @@ export interface ICampaign {
       company: string;
       selected: boolean;
       profilePicture: string;
+      profileUrl: string;
+      location: string;
     }>;
     total: number;
     currentPage: number;

@@ -27,18 +27,19 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JwtPayload;
-    const user = await User.findOne({ _id: new mongoose.Types.ObjectId(decoded._id) });
+    const user = await User.findById(decoded._id);
 
     if (!user) {
       throw new Error();
     }
 
     req.user = {
-      _id: (user as any)._id.toString(),
+      _id: user._id.toString(),
       email: user.email
     };
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error);
     res.status(401).json({ error: 'Please authenticate' });
   }
 }; 

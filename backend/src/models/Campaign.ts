@@ -7,6 +7,7 @@ export interface ICampaign extends Document {
   endDate: Date;
   targetRole: string;
   location: string;
+  seniority: string;
   outreachType: string;
   createdBy: mongoose.Types.ObjectId;
   status: 'draft' | 'active' | 'paused' | 'completed';
@@ -17,6 +18,8 @@ export interface ICampaign extends Document {
       company: string;
       selected: boolean;
       profilePicture: string;
+      profileUrl: string;
+      location: string;
     }>;
     total: number;
     currentPage: number;
@@ -52,6 +55,7 @@ export interface ICampaign extends Document {
     };
     lastUpdated: Date;
   };
+  emailTemplate?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +67,7 @@ const CampaignSchema = new Schema<ICampaign>({
   endDate: { type: Date, required: true },
   targetRole: { type: String, required: true },
   location: { type: String, required: true },
+  seniority: { type: String, required: true },
   outreachType: { type: String, required: true },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   status: { 
@@ -75,8 +80,10 @@ const CampaignSchema = new Schema<ICampaign>({
       name: String,
       role: String,
       company: String,
-      selected: Boolean,
-      profilePicture: String
+      selected: { type: Boolean, default: false },
+      profilePicture: String,
+      profileUrl: String,
+      location: String
     }],
     total: Number,
     currentPage: Number,
@@ -111,7 +118,8 @@ const CampaignSchema = new Schema<ICampaign>({
       seniority: String
     },
     lastUpdated: Date
-  }
+  },
+  emailTemplate: String
 }, {
   timestamps: true
 });

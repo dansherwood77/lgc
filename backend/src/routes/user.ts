@@ -2,6 +2,7 @@ import express, { Request } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User';
 import { auth } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
 
 interface AuthRequest extends Request {
   user?: any;
@@ -13,41 +14,79 @@ const router = express.Router();
 router.post('/register', async (req: AuthRequest, res) => {
   try {
     const { firstName, lastName, email, password, linkedinEmail, linkedinPassword } = req.body;
+    console.log('Received registration request with data:', { 
+      firstName, 
+      lastName, 
+      email, 
+      linkedinEmail,
+      hasPassword: !!password,
+      hasLinkedinPassword: !!linkedinPassword
+    });
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !linkedinEmail || !linkedinPassword) {
-      return res.status(400).json({ error: 'All fields are required' });
+    // Check each field individually and collect missing fields
+    const missingFields = [];
+    if (!firstName) missingFields.push('firstName');
+    if (!lastName) missingFields.push('lastName');
+    if (!email) missingFields.push('email');
+    if (!password) missingFields.push('password');
+    if (!linkedinEmail) missingFields.push('linkedinEmail');
+    if (!linkedinPassword) missingFields.push('linkedinPassword');
+
+    if (missingFields.length > 0) {
+      console.log('Missing required fields:', missingFields);
+      return res.status(400).json({ 
+        error: 'All fields are required', 
+        missingFields 
+      });
     }
 
-    // Check if user already exists
+    console.log('Checking for existing user with email:', email);
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('User already exists with email:', email);
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Create new user
-    const user = new User({ firstName, lastName, email, password, linkedinEmail, linkedinPassword });
-    await user.save();
+    console.log('Creating new user with email:', email);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ 
+      firstName, 
+      lastName, 
+      email, 
+      password: hashedPassword,
+      linkedinEmail,
+      linkedinPassword
+    });
     
+    console.log('Saving user to database...');
+    await user.save();
+    console.log('User saved successfully');
+
     // Generate JWT token
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET || 'your-secret-key');
     
-    // Return user data (excluding passwords) and token
-    const userResponse = {
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      linkedinEmail: user.linkedinEmail
+    const response = {
+      message: 'User registered successfully',
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        linkedinEmail: user.linkedinEmail,
+        createdAt: user.createdAt
+      },
+      token
     };
     
-    res.status(201).json({ user: userResponse, token });
-  } catch (error: any) {
-    console.error('Registration error:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ error: error.message });
+    console.log('Sending registration success response:', response);
+    res.status(201).json(response);
+  } catch (error) {
+    console.error('Registration error details:', error);
+    if (error instanceof Error) {
+      res.status(500).json({ error: 'Failed to register user', details: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to register user' });
     }
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
 
@@ -55,33 +94,40 @@ router.post('/register', async (req: AuthRequest, res) => {
 router.post('/login', async (req: AuthRequest, res) => {
   try {
     const { email, password } = req.body;
+    console.log('Login attempt for email:', email);
 
     // Validate required fields
     if (!email || !password) {
+      console.log('Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
     const user = await User.findOne({ email });
+    console.log('User found:', user ? 'Yes' : 'No');
     
     if (!user) {
+      console.log('No user found with email:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const isMatch = await user.comparePassword(password);
+    console.log('Comparing passwords...');
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match:', isMatch ? 'Yes' : 'No');
+
     if (!isMatch) {
+      console.log('Password does not match');
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET || 'your-secret-key');
+    console.log('Login successful, token generated');
     
     // Return user data without password
     const userResponse = {
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email,
-      linkedinEmail: user.linkedinEmail,
-      linkedinPassword: user.linkedinPassword
+      email: user.email
     };
     
     res.json({ user: userResponse, token });
@@ -93,105 +139,58 @@ router.post('/login', async (req: AuthRequest, res) => {
 
 // Get user profile
 router.get('/profile', auth, async (req: AuthRequest, res) => {
-  res.json(req.user);
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
 });
 
 // Update user profile
 router.put('/profile', auth, async (req: AuthRequest, res) => {
-  console.log('Received profile update request:', {
-    body: req.body,
-    user: req.user
-  });
-
-  const updates = Object.keys(req.body);
-  const allowedUpdates = ['firstName', 'lastName', 'email', 'currentPassword', 'newPassword', 'confirmPassword', 'linkedinEmail', 'linkedinPassword'];
-  const isValidOperation = updates.every(update => allowedUpdates.includes(update));
-
-  if (!isValidOperation) {
-    console.log('Invalid updates attempted:', updates);
-    return res.status(400).json({ 
-      error: 'Invalid updates',
-      attemptedUpdates: updates,
-      allowedUpdates: allowedUpdates
-    });
-  }
-
   try {
-    // If updating email, check if it's already taken
-    if (updates.includes('email')) {
-      const existingUser = await User.findOne({ email: req.body.email }).select('_id') as { _id: any } | null;
-      if (existingUser && existingUser._id.toString() !== (req.user as any)._id.toString()) {
-        return res.status(400).json({ error: 'Email is already in use' });
+    const allowedUpdates = ['firstName', 'lastName', 'email', 'currentPassword', 'newPassword', 'confirmPassword'];
+    const updates = Object.keys(req.body).filter(key => allowedUpdates.includes(key));
+    
+    if (updates.includes('currentPassword') && updates.includes('newPassword') && updates.includes('confirmPassword')) {
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
       }
-    }
 
-    // If updating password, validate current password and confirm password
-    if (req.body.newPassword) {
-      if (!req.body.currentPassword) {
-        return res.status(400).json({ error: 'Current password is required to change password' });
-      }
-      
-      if (!req.body.confirmPassword) {
-        return res.status(400).json({ error: 'Please confirm your new password' });
+      const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
       }
 
       if (req.body.newPassword !== req.body.confirmPassword) {
         return res.status(400).json({ error: 'New passwords do not match' });
       }
-      
-      const isMatch = await req.user.comparePassword(req.body.currentPassword);
-      if (!isMatch) {
-        return res.status(400).json({ error: 'Current password is incorrect' });
-      }
-      
-      // Update password
-      req.user.password = req.body.newPassword;
+
+      user.password = await bcrypt.hash(req.body.newPassword, 10);
+      await user.save();
+      return res.json({ message: 'Password updated successfully' });
     }
 
-    // Update other fields
-    updates.forEach(update => {
-      if (update !== 'currentPassword' && update !== 'newPassword' && update !== 'confirmPassword') {
-        console.log(`Updating field ${update} to:`, req.body[update]);
-        (req.user as any)[update] = req.body[update];
-      }
-    });
-    
-    await req.user.save();
-    
-    // Return user data without password
-    const userResponse = {
-      _id: req.user._id,
-      firstName: req.user.firstName,
-      lastName: req.user.lastName,
-      email: req.user.email,
-      linkedinEmail: req.user.linkedinEmail,
-      linkedinPassword: req.user.linkedinPassword
-    };
-    
-    console.log('Profile update successful:', userResponse);
-    res.json(userResponse);
-  } catch (error: any) {
-    console.error('Profile update error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      validationErrors: error.errors
-    });
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ 
-        error: error.message,
-        validationErrors: error.errors
-      });
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates.reduce((acc, key) => ({ ...acc, [key]: req.body[key] }), {}) },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    if (error.name === 'MongoError' && error.code === 11000) {
-      return res.status(400).json({ error: 'Email is already in use' });
-    }
-    res.status(500).json({ 
-      error: 'Failed to update profile',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+
+    res.json(user);
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

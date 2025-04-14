@@ -12,6 +12,25 @@ interface Campaign {
   outreachType: string;
   status: 'draft' | 'active' | 'completed' | 'cancelled';
   createdBy: string;
+  linkedinSearchResults?: {
+    contacts: Array<{
+      name: string;
+      role: string;
+      company: string;
+      selected: boolean;
+      profilePicture: string;
+    }>;
+    total: number;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    searchParams: {
+      location: string;
+      targetRole: string;
+      seniority: string;
+    };
+    lastUpdated: string;
+  };
 }
 
 interface CampaignContextType {
@@ -51,8 +70,12 @@ export const CampaignProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const fetchCampaigns = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
+      if (!token) {
+        console.error('No token found in localStorage');
+        throw new Error('Not authenticated');
+      }
 
+      console.log('Fetching campaigns with token:', token.substring(0, 10) + '...');
       const response = await fetch(`${API_URL}/campaigns`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -60,12 +83,15 @@ export const CampaignProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch campaigns');
+        const errorData = await response.json();
+        console.error('Campaign fetch error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch campaigns');
       }
 
       const data = await response.json();
       setCampaigns(data);
     } catch (error) {
+      console.error('Campaign fetch error:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
