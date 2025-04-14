@@ -29,17 +29,24 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  CircularProgress,
+  Pagination,
+  ListItemAvatar,
+  Avatar,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   Check as CheckIcon,
   Close as CloseIcon,
+  Search as SearchIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ICampaign } from '../types';
 
 const steps = [
   'Location & Outreach Type',
@@ -56,6 +63,7 @@ interface Contact {
   role: string;
   company: string;
   selected: boolean;
+  profilePicture?: string;
 }
 
 const CampaignSetup: React.FC = () => {
@@ -68,12 +76,15 @@ const CampaignSetup: React.FC = () => {
   const [emailTemplate, setEmailTemplate] = useState('');
   const [sendDate, setSendDate] = useState<Date | null>(null);
   const [sendTime, setSendTime] = useState<Date | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([
-    { id: 1, name: 'John Doe', role: 'Senior Software Engineer', company: 'Tech Corp', selected: false },
-    { id: 2, name: 'Jane Smith', role: 'Product Manager', company: 'Startup Inc', selected: false },
-  ]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [searching, setSearching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [campaignId, setCampaignId] = useState<string | null>(null);
+  const pageSize = 10;
 
   const validateStep = (step: number): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -117,9 +128,115 @@ const CampaignSetup: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const updateCampaign = async (data: Partial<ICampaign>) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+
+      const url = campaignId 
+        ? `http://localhost:5001/api/campaigns/${campaignId}`
+        : 'http://localhost:5001/api/campaigns';
+
+      const method = campaignId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update campaign');
+      }
+
+      const result = await response.json();
+      if (!campaignId) {
+        setCampaignId(result._id);
+      }
+      return result;
+    } catch (error) {
+      console.error('Error updating campaign:', error);
+      setErrors(prev => ({
+        ...prev,
+        submit: 'Failed to update campaign. Please try again.'
+      }));
+      throw error;
+    }
+  };
+
+  const handleNext = async () => {
     if (validateStep(activeStep)) {
-      setActiveStep((prevStep) => prevStep + 1);
+      try {
+        switch (activeStep) {
+          case 0:
+            if (!campaignId) {
+              // Initial campaign creation
+              await updateCampaign({
+                name: `${outreachType} Outreach - ${location}`,
+                description: `Outreach campaign in ${location} using ${outreachType} meetings`,
+                startDate: new Date(),
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+                targetRole: 'To be determined', // Initial value
+                location,
+                outreachType,
+                status: 'draft'
+              });
+            } else {
+              // Update existing campaign
+              await updateCampaign({
+                location,
+                outreachType
+              });
+            }
+            break;
+          case 1:
+            await updateCampaign({
+              targetRole,
+              linkedinSearchResults: {
+                contacts: [],
+                total: 0,
+                currentPage: 1,
+                pageSize: 10,
+                totalPages: 0,
+                searchParams: {
+                  location,
+                  targetRole,
+                  seniority
+                },
+                lastUpdated: new Date()
+              },
+              status: 'draft'
+            });
+            break;
+          case 2:
+            await updateCampaign({
+              linkedinSearchResults: {
+                contacts: contacts.map(contact => ({
+                  ...contact,
+                  profilePicture: contact.profilePicture || ''
+                })),
+                total: totalResults,
+                currentPage,
+                pageSize,
+                totalPages,
+                searchParams: {
+                  location,
+                  targetRole,
+                  seniority
+                },
+                lastUpdated: new Date()
+              },
+              status: 'draft'
+            });
+            break;
+        }
+        setActiveStep((prevStep) => prevStep + 1);
+      } catch (error) {
+        console.error('Error saving campaign step:', error);
+      }
     }
   };
 
@@ -129,45 +246,26 @@ const CampaignSetup: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      // Combine date and time for start and end dates
+      if (!validateStep(activeStep)) return;
+
       const startDateTime = new Date(sendDate!);
       startDateTime.setHours(sendTime!.getHours(), sendTime!.getMinutes());
       
       const endDateTime = new Date(sendDate!);
-      endDateTime.setHours(sendTime!.getHours() + 1, sendTime!.getMinutes()); // Assuming 1 hour duration
+      endDateTime.setHours(sendTime!.getHours() + 1, sendTime!.getMinutes());
 
-      const campaignData = {
+      await updateCampaign({
         name: `${targetRole} Outreach - ${location}`,
         description: `Outreach campaign targeting ${targetRole} in ${location} using ${outreachType} meetings`,
         startDate: startDateTime,
         endDate: endDateTime,
-        targetRole,
-        location,
-        outreachType,
-        status: 'draft' as const,
-        emailTemplate
-      };
-
-      const response = await fetch('http://localhost:5001/api/campaigns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(campaignData)
+        emailTemplate,
+        status: 'active'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create campaign');
-      }
 
       navigate('/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      setErrors(prev => ({
-        ...prev,
-        submit: 'Failed to create campaign. Please try again.'
-      }));
     }
   };
 
@@ -175,6 +273,79 @@ const CampaignSetup: React.FC = () => {
     setContacts(contacts.map(contact => 
       contact.id === contactId ? { ...contact, selected: !contact.selected } : contact
     ));
+  };
+
+  const searchLinkedIn = async (page: number = 1) => {
+    try {
+      setSearching(true);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch('http://localhost:5001/api/linkedin/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          location, 
+          targetRole, 
+          seniority,
+          page,
+          pageSize,
+          campaignId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search LinkedIn');
+      }
+
+      const data = await response.json();
+      const newContacts = data.contacts.map((contact: any, index: number) => ({
+        ...contact,
+        id: (page - 1) * pageSize + index + 1,
+        selected: false,
+        profilePicture: contact.profilePicture || ''
+      }));
+      
+      setContacts(newContacts);
+      setTotalPages(data.totalPages);
+      setTotalResults(data.total);
+      setCurrentPage(page);
+
+      // Update campaign with new search results
+      if (campaignId) {
+        await updateCampaign({
+          linkedinSearchResults: {
+            contacts: newContacts,
+            total: data.total,
+            currentPage: page,
+            pageSize,
+            totalPages: data.totalPages,
+            searchParams: {
+              location,
+              targetRole,
+              seniority
+            },
+            lastUpdated: new Date()
+          }
+        });
+      }
+    } catch (error) {
+      console.error('LinkedIn search error:', error);
+      setErrors(prev => ({
+        ...prev,
+        linkedin: 'Failed to search LinkedIn. Please try again.'
+      }));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    event.preventDefault(); // Prevent default anchor behavior
+    searchLinkedIn(value);
   };
 
   const ErrorAlert: React.FC<{ message: string }> = ({ message }) => (
@@ -274,25 +445,72 @@ const CampaignSetup: React.FC = () => {
         return (
           <Box sx={{ mt: 2 }}>
             {errors.contacts && <ErrorAlert message={errors.contacts} />}
-            <Paper sx={{ p: 2 }}>
+            {errors.linkedin && <ErrorAlert message={errors.linkedin} />}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              <Typography variant="h6">Review Contacts</Typography>
+              <Button
+                variant="contained"
+                onClick={() => searchLinkedIn(1)}
+                disabled={searching || !location || !targetRole || !seniority}
+                startIcon={searching ? <CircularProgress size={20} /> : <SearchIcon />}
+              >
+                {searching ? 'Searching...' : 'Search LinkedIn'}
+              </Button>
+            </Box>
+            <Paper>
               <List>
                 {contacts.map((contact) => (
-                  <ListItem key={contact.id}>
-                    <ListItemText
-                      primary={contact.name}
-                      secondary={`${contact.role} at ${contact.company}`}
-                    />
-                    <ListItemSecondaryAction>
+                  <ListItem
+                    key={contact.id}
+                    secondaryAction={
                       <IconButton
                         edge="end"
                         onClick={() => toggleContactSelection(contact.id)}
                       >
-                        {contact.selected ? <CheckIcon color="primary" /> : <CloseIcon />}
+                        {contact.selected ? <CheckIcon color="primary" /> : <AddIcon />}
                       </IconButton>
-                    </ListItemSecondaryAction>
+                    }
+                  >
+                    <ListItemAvatar>
+                      {contact.profilePicture ? (
+                        <Avatar src={contact.profilePicture} alt={contact.name} />
+                      ) : (
+                        <Avatar>{contact.name.charAt(0)}</Avatar>
+                      )}
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={contact.name}
+                      secondary={
+                        <>
+                          <Typography component="span" variant="body2" color="text.primary">
+                            {contact.role}
+                          </Typography>
+                          {` — ${contact.company}`}
+                        </>
+                      }
+                    />
                   </ListItem>
                 ))}
+                {contacts.length === 0 && (
+                  <ListItem>
+                    <ListItemText
+                      primary="No contacts found"
+                      secondary="Use the search button to find contacts on LinkedIn"
+                    />
+                  </ListItem>
+                )}
               </List>
+              {totalResults > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                    disabled={searching}
+                  />
+                </Box>
+              )}
             </Paper>
           </Box>
         );

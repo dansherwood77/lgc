@@ -9,7 +9,28 @@ export interface ICampaign extends Document {
   location: string;
   outreachType: string;
   createdBy: mongoose.Types.ObjectId;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  status: 'draft' | 'active' | 'paused' | 'completed';
+  linkedinSearchResults?: {
+    contacts: Array<{
+      name: string;
+      role: string;
+      company: string;
+      selected: boolean;
+      profilePicture: string;
+    }>;
+    total: number;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    searchParams: {
+      location: string;
+      targetRole: string;
+      seniority: string;
+    };
+    lastUpdated: Date;
+  };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const CampaignSchema = new Schema<ICampaign>({
@@ -23,8 +44,27 @@ const CampaignSchema = new Schema<ICampaign>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   status: { 
     type: String, 
-    enum: ['draft', 'active', 'completed', 'cancelled'],
+    enum: ['draft', 'active', 'paused', 'completed'],
     default: 'draft'
+  },
+  linkedinSearchResults: {
+    contacts: [{
+      name: String,
+      role: String,
+      company: String,
+      selected: Boolean,
+      profilePicture: String
+    }],
+    total: Number,
+    currentPage: Number,
+    pageSize: Number,
+    totalPages: Number,
+    searchParams: {
+      location: String,
+      targetRole: String,
+      seniority: String
+    },
+    lastUpdated: Date
   }
 }, {
   timestamps: true

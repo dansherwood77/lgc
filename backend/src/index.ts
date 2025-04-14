@@ -5,23 +5,25 @@ import dotenv from 'dotenv';
 import { connectDB } from './utils/db';
 import userRoutes from './routes/user';
 import campaignRoutes from './routes/campaign';
+import linkedinRoutes from './routes/linkedin';
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5001;
-
-// Connect to MongoDB
-connectDB();
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Connect to MongoDB
+connectDB();
+
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
+app.use('/api/linkedin', linkedinRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -30,6 +32,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 }); 
