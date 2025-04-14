@@ -6,6 +6,7 @@ export interface IUser extends Document {
   lastName: string;
   email: string;
   password: string;
+  isVerified: boolean;
   linkedinEmail?: string;
   linkedinPassword?: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -16,6 +17,7 @@ const UserSchema = new Schema<IUser>({
   lastName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  isVerified: { type: Boolean, default: false },
   linkedinEmail: { type: String },
   linkedinPassword: { type: String }
 });

@@ -61,29 +61,41 @@ router.put('/:id', auth, async (req: AuthRequest, res) => {
     'targetRole',
     'location',
     'outreachType',
-    'status'
+    'status',
+    'linkedinSearchResults'
   ];
   
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
   
   if (!isValidOperation) {
+    console.error('Invalid updates attempted:', updates);
+    console.error('Allowed updates:', allowedUpdates);
     return res.status(400).json({ error: 'Invalid updates' });
   }
 
   try {
+    console.log('Finding campaign with ID:', req.params.id);
     const campaign = await Campaign.findOne({
       _id: req.params.id,
       createdBy: req.user._id
     });
 
     if (!campaign) {
+      console.error('Campaign not found:', req.params.id);
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    updates.forEach(update => (campaign as any)[update] = req.body[update]);
+    console.log('Updating campaign with data:', req.body);
+    updates.forEach(update => {
+      console.log(`Setting ${update} to:`, req.body[update]);
+      (campaign as any)[update] = req.body[update];
+    });
+
     await campaign.save();
+    console.log('Campaign updated successfully');
     res.json(campaign);
   } catch (error) {
+    console.error('Error updating campaign:', error);
     res.status(400).json({ error: 'Failed to update campaign' });
   }
 });

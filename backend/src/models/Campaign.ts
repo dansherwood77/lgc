@@ -29,6 +29,29 @@ export interface ICampaign extends Document {
     };
     lastUpdated: Date;
   };
+  githubSearchResults?: {
+    contacts: Array<{
+      name: string;
+      role: string;
+      company: string;
+      location: string;
+      selected: boolean;
+      profilePicture: string;
+      githubUrl: string;
+      contributions: number;
+      repositories: number;
+    }>;
+    total: number;
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    searchParams: {
+      location: string;
+      targetRole: string;
+      seniority: string;
+    };
+    lastUpdated: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +77,29 @@ const CampaignSchema = new Schema<ICampaign>({
       company: String,
       selected: Boolean,
       profilePicture: String
+    }],
+    total: Number,
+    currentPage: Number,
+    pageSize: Number,
+    totalPages: Number,
+    searchParams: {
+      location: String,
+      targetRole: String,
+      seniority: String
+    },
+    lastUpdated: Date
+  },
+  githubSearchResults: {
+    contacts: [{
+      name: String,
+      role: String,
+      company: String,
+      location: String,
+      selected: Boolean,
+      profilePicture: String,
+      githubUrl: String,
+      contributions: Number,
+      repositories: Number
     }],
     total: Number,
     currentPage: Number,

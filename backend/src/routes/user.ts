@@ -79,7 +79,9 @@ router.post('/login', async (req: AuthRequest, res) => {
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email
+      email: user.email,
+      linkedinEmail: user.linkedinEmail,
+      linkedinPassword: user.linkedinPassword
     };
     
     res.json({ user: userResponse, token });
@@ -96,12 +98,22 @@ router.get('/profile', auth, async (req: AuthRequest, res) => {
 
 // Update user profile
 router.put('/profile', auth, async (req: AuthRequest, res) => {
+  console.log('Received profile update request:', {
+    body: req.body,
+    user: req.user
+  });
+
   const updates = Object.keys(req.body);
-  const allowedUpdates = ['firstName', 'lastName', 'email', 'currentPassword', 'newPassword'];
+  const allowedUpdates = ['firstName', 'lastName', 'email', 'currentPassword', 'newPassword', 'confirmPassword', 'linkedinEmail', 'linkedinPassword'];
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
   if (!isValidOperation) {
-    return res.status(400).json({ error: 'Invalid updates' });
+    console.log('Invalid updates attempted:', updates);
+    return res.status(400).json({ 
+      error: 'Invalid updates',
+      attemptedUpdates: updates,
+      allowedUpdates: allowedUpdates
+    });
   }
 
   try {
@@ -113,10 +125,18 @@ router.put('/profile', auth, async (req: AuthRequest, res) => {
       }
     }
 
-    // If updating password, validate current password
+    // If updating password, validate current password and confirm password
     if (req.body.newPassword) {
       if (!req.body.currentPassword) {
         return res.status(400).json({ error: 'Current password is required to change password' });
+      }
+      
+      if (!req.body.confirmPassword) {
+        return res.status(400).json({ error: 'Please confirm your new password' });
+      }
+
+      if (req.body.newPassword !== req.body.confirmPassword) {
+        return res.status(400).json({ error: 'New passwords do not match' });
       }
       
       const isMatch = await req.user.comparePassword(req.body.currentPassword);
@@ -130,7 +150,8 @@ router.put('/profile', auth, async (req: AuthRequest, res) => {
 
     // Update other fields
     updates.forEach(update => {
-      if (update !== 'currentPassword' && update !== 'newPassword') {
+      if (update !== 'currentPassword' && update !== 'newPassword' && update !== 'confirmPassword') {
+        console.log(`Updating field ${update} to:`, req.body[update]);
         (req.user as any)[update] = req.body[update];
       }
     });
@@ -142,24 +163,31 @@ router.put('/profile', auth, async (req: AuthRequest, res) => {
       _id: req.user._id,
       firstName: req.user.firstName,
       lastName: req.user.lastName,
-      email: req.user.email
+      email: req.user.email,
+      linkedinEmail: req.user.linkedinEmail,
+      linkedinPassword: req.user.linkedinPassword
     };
     
+    console.log('Profile update successful:', userResponse);
     res.json(userResponse);
   } catch (error: any) {
-    console.error('Profile update error:', error);
+    console.error('Profile update error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      validationErrors: error.errors
+    });
+    
     if (error.name === 'ValidationError') {
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ 
+        error: error.message,
+        validationErrors: error.errors
+      });
     }
     if (error.name === 'MongoError' && error.code === 11000) {
       return res.status(400).json({ error: 'Email is already in use' });
     }
-    console.error('Detailed error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
     res.status(500).json({ 
       error: 'Failed to update profile',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined

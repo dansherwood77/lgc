@@ -1,0 +1,8 @@
+{
+  "watch": ["src/**/*.ts", ".env"],
+  "ext": "ts,json,env",
+  "ignore": ["src/**/*.spec.ts", "src/**/*.test.ts"],
+  "exec": "ts-node ./src/index.ts",
+  "verbose": true,
+  "delay": "1000"
+} 

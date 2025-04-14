@@ -1,8 +1,7 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { connectDB } from './utils/db';
 import userRoutes from './routes/user';
 import campaignRoutes from './routes/campaign';
 import linkedinRoutes from './routes/linkedin';
@@ -10,28 +9,22 @@ import linkedinRoutes from './routes/linkedin';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
-
-// Connect to MongoDB
-connectDB();
 
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/linkedin', linkedinRoutes);
 
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lgc')
+  .then(() => console.log('Connected to MongoDB'))
+  .catch((error) => console.error('MongoDB connection error:', error));
 
-// Start server
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 }); 
