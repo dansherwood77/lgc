@@ -23,20 +23,21 @@ console.log('- API Token length:', apiToken.length);
 console.log('- LinkedIn Cookie length:', linkedinCookie.length);
 console.log('- Cookie format:', linkedinCookie.startsWith('[') ? 'JSON array' : 'Other format');
 
-const scraper = new ApifyLinkedInScraper(apiToken, linkedinCookie);
 console.log('ApifyLinkedInScraper initialized successfully');
 
+const scraper = new ApifyLinkedInScraper(apiToken, linkedinCookie);
 // Search LinkedIn profiles
 router.post('/search', auth, async (req, res) => {
   try {
     const { targetRole, location, seniority } = req.body;
-
+    
     if (!targetRole || !location || !seniority) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
-
+    
     console.log('Starting LinkedIn search process...');
     console.log('Search parameters:', { targetRole, location, seniority });
+    
 
     // Search profiles
     const profiles = await scraper.searchProfiles(targetRole, location, seniority);

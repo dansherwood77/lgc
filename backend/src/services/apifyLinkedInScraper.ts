@@ -39,66 +39,46 @@ export class ApifyLinkedInScraper {
   async searchProfiles(targetRole: string, location: string, seniority: string): Promise<LinkedInProfile[]> {
     try {
       console.log('Starting LinkedIn search with Apify...');
-      console.log('Search parameters:', { targetRole, location, seniority });
       console.log('Cookie array length:', this.linkedinCookie.length);
       
       // Prepare the actor input
-      const input = {
-        searchUrl: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${targetRole} ${seniority}`)}&location=${encodeURIComponent(location)}`,
-        startPage: 1,
-        minDelay: 2,
-        maxDelay: 5,
-        cookie: this.linkedinCookie
+      const input={
+        "action": "get-profiles",
+        "isName": false,
+        "isUrl": false,
+        "keywords": [
+            `${seniority} ${targetRole}`
+        ],
+        "limit": 60,
+        "location": [
+            location
+        ]
       };
-
-      console.log('Prepared input for Apify actor:', {
-        searchUrl: input.searchUrl,
-        startPage: input.startPage,
-        minDelay: input.minDelay,
-        maxDelay: input.maxDelay,
-        cookieLength: input.cookie.length
-      });
-
       // Run the actor and wait for it to finish
       console.log('Calling Apify actor...');
-      try {
-        const actor = this.client.actor('curious_coder/linkedin-people-search-scraper');
-        console.log('Actor initialized, starting run...');
-        
+      try {             
         // Add a timeout to the actor call
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Actor call timed out after 1 minute')), 60 * 1000);
-        });
+        // const timeoutPromise = new Promise((_, reject) => {
+        //   setTimeout(() => reject(new Error('Actor call timed out after 1 minute')), 60 * 1000);
+        // });
 
-        const runPromise = actor.call(input);
-        const run = await Promise.race([runPromise, timeoutPromise]) as any;
-        
-        console.log('Actor run completed:', {
-          runId: run?.id,
-          status: run?.status,
-          defaultDatasetId: run?.defaultDatasetId,
-          error: run?.error
-        });
-        
-        if (!run?.defaultDatasetId) {
-          throw new Error('No dataset ID returned from actor run');
-        }
-
-        console.log(`💾 Check your data here: https://console.apify.com/storage/datasets/${run.defaultDatasetId}`);
-
-        // Fetch and transform the results
-        console.log('Fetching dataset items...');
-        const dataset = this.client.dataset(run.defaultDatasetId);
-        const { items } = await dataset.listItems();
+        const run  = await this.client.actor('od6RadQV98FOARtrp').call( input );
+        console.log('Results from dataset');
+        const { items } = await this.client.dataset(run.defaultDatasetId).listItems();
+     
         console.log(`Found ${items.length} profiles`);
         
         return items.map((item: any) => ({
-          name: item.fullName,
-          role: item.headline,
-          company: item.headline?.split(' at ')[1] || '',
-          location: item.location,
-          profileUrl: item.profileUrl,
-          profilePicture: item.profilePicture
+          name: item["firstName"] + ' ' + item["lastName"],
+          role: item["headline"],
+          company: item["ORGANIZATIONS"],
+          honorsAndAwards: item["HONORS_AND_AWARDS"],
+          licensesAndCertification: item['LICENSES_AND_CERTIFICATIONS'],
+          experience: item["EXPERIENCE"],
+          education: item["EDUCATION"],
+          location: location,
+          profileUrl: item["url"],
+          // profilePicture: item.profilePicture
         }));
       } catch (actorError) {
         console.error('Error during Apify actor execution:', {
